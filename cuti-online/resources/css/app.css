@@ -1,0 +1,225 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: Inter, ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+}
+
+@layer base {
+    html {
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+    }
+
+    body {
+        @apply bg-slate-50 text-slate-900;
+    }
+}
+
+@layer components {
+    .app-shell {
+        @apply min-h-screen bg-[radial-gradient(circle_at_top_left,_#dbeafe_0,_transparent_27%),linear-gradient(180deg,_#f8fafc_0%,_#f1f5f9_100%)];
+    }
+
+    .sidebar-link {
+        @apply flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-slate-600 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-950;
+    }
+
+    .sidebar-link-active {
+        @apply bg-sky-50 text-sky-800 shadow-[inset_0_0_0_1px_rgba(14,165,233,0.16)];
+    }
+
+    .workspace-tabs {
+        @apply mb-6 overflow-hidden rounded-2xl bg-white p-1 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_20px_rgba(15,23,42,0.05)];
+    }
+
+    .workspace-tablist {
+        @apply flex gap-1 overflow-x-auto;
+    }
+
+    .workspace-tab {
+        @apply flex min-h-11 shrink-0 items-stretch rounded-xl text-sm font-medium text-slate-500 transition-colors duration-150 hover:bg-slate-50 hover:text-slate-900;
+    }
+
+    .workspace-tab-active {
+        @apply bg-sky-50 text-sky-800 shadow-[inset_0_0_0_1px_rgba(14,165,233,0.16)];
+    }
+
+    .workspace-tab-trigger {
+        @apply flex min-h-11 min-w-0 items-center px-3 outline-none focus-visible:rounded-lg focus-visible:shadow-[inset_0_0_0_2px_rgba(14,165,233,0.6)];
+    }
+
+    .workspace-tab-close {
+        @apply grid size-10 place-items-center rounded-lg text-slate-400 outline-none transition-colors duration-150 hover:bg-slate-200/70 hover:text-slate-900 focus-visible:shadow-[inset_0_0_0_2px_rgba(14,165,233,0.6)];
+    }
+
+    .workspace-tab-active .workspace-tab-close {
+        @apply text-sky-700 hover:bg-sky-100 hover:text-sky-950;
+    }
+
+    .workspace-frame {
+        @apply block w-full overflow-hidden border-0;
+        min-height: 38rem;
+    }
+
+    .card {
+        @apply rounded-2xl bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_rgba(15,23,42,0.06)];
+    }
+
+    .card-inner {
+        @apply rounded-xl bg-slate-50 p-4;
+    }
+
+    .page-title {
+        @apply text-2xl font-semibold tracking-[-0.02em] text-slate-950 [text-wrap:balance];
+    }
+
+    .page-description {
+        @apply mt-1 max-w-2xl text-sm leading-6 text-slate-500 [text-wrap:pretty];
+    }
+
+    .section-heading {
+        @apply text-sm font-semibold text-slate-900;
+    }
+
+    .section-description {
+        @apply mt-1 text-sm leading-5 text-slate-500;
+    }
+
+    .form-label {
+        @apply mb-1.5 block text-sm font-medium text-slate-700;
+    }
+
+    .form-input {
+        @apply min-h-11 w-full rounded-xl border-0 bg-slate-100 px-3.5 text-sm text-slate-900 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] outline-none transition-shadow duration-150 placeholder:text-slate-400 focus:bg-white focus:shadow-[inset_0_0_0_2px_rgba(14,165,233,0.6)];
+    }
+
+    .date-range-picker {
+        @apply rounded-2xl bg-white p-3 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08),0_6px_18px_rgba(15,23,42,0.04)] sm:p-4;
+    }
+
+    .date-range-picker-header {
+        @apply flex items-center justify-end gap-3;
+    }
+
+    .date-range-picker-navigation {
+        @apply flex items-center gap-3;
+    }
+
+    .date-range-picker-month {
+        @apply text-base font-semibold text-slate-900 sm:text-lg;
+    }
+
+    .date-range-picker-nav {
+        @apply grid size-10 shrink-0 place-items-center rounded-xl bg-white text-slate-700 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.1)] outline-none transition-transform duration-150 hover:bg-slate-50 active:scale-[0.96] focus-visible:shadow-[inset_0_0_0_2px_rgba(14,165,233,0.6)];
+    }
+
+    .date-range-picker-weekdays {
+        @apply mt-4 grid grid-cols-7 gap-1.5 text-center text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-slate-500 sm:text-xs;
+    }
+
+    .date-range-picker-grid {
+        @apply mt-1.5 grid grid-cols-7 gap-1.5;
+    }
+
+    .date-range-picker-day {
+        @apply flex min-h-11 items-center justify-center rounded-xl bg-white text-sm font-semibold tabular-nums text-slate-700 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] outline-none transition-colors duration-150 hover:bg-sky-50 hover:text-sky-900 focus-visible:z-10 focus-visible:shadow-[inset_0_0_0_2px_rgba(14,165,233,0.6)] sm:min-h-12;
+    }
+
+    .date-range-picker-day.is-empty {
+        @apply pointer-events-none bg-transparent shadow-none;
+    }
+
+    .date-range-picker-day.is-today {
+        @apply shadow-[inset_0_0_0_2px_rgba(14,165,233,0.35)];
+    }
+
+    .date-range-picker-day.is-selected {
+        @apply rounded-lg bg-sky-100 text-sky-900 shadow-none hover:bg-sky-200;
+    }
+
+    .date-range-picker-day.is-weekend {
+        @apply cursor-not-allowed bg-slate-50 text-slate-300 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.04)];
+    }
+
+    .date-range-picker-day.is-start,
+    .date-range-picker-day.is-end {
+        @apply rounded-xl bg-blue-600 text-white shadow-[0_6px_14px_rgba(37,99,235,0.24)] hover:bg-blue-700 hover:text-white;
+    }
+
+    .date-range-picker-summary {
+        @apply mt-4 text-sm leading-6 text-slate-500 [text-wrap:pretty];
+    }
+
+    .date-range-picker-invalid {
+        @apply shadow-[inset_0_0_0_2px_rgba(225,29,72,0.55),0_8px_24px_rgba(225,29,72,0.06)];
+    }
+
+    .form-select {
+        @apply min-h-11 w-full appearance-none rounded-xl border-0 bg-slate-100 px-3.5 pr-10 text-sm text-slate-900 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] outline-none transition-shadow duration-150 placeholder:text-slate-400 focus:bg-white focus:shadow-[inset_0_0_0_2px_rgba(14,165,233,0.6)];
+    }
+
+    .form-textarea {
+        @apply min-h-28 w-full rounded-xl border-0 bg-slate-100 px-3.5 py-3 text-sm text-slate-900 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] outline-none transition-shadow duration-150 placeholder:text-slate-400 focus:bg-white focus:shadow-[inset_0_0_0_2px_rgba(14,165,233,0.6)];
+    }
+
+    .form-help {
+        @apply mt-1.5 text-xs leading-5 text-slate-500;
+    }
+
+    .form-error {
+        @apply mt-1.5 text-xs font-medium text-rose-600;
+    }
+
+    .btn-primary {
+        @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(2,132,199,0.24)] transition-transform duration-150 hover:bg-sky-700 active:scale-[0.96];
+    }
+
+    .btn-secondary {
+        @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-slate-700 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.1)] transition-transform duration-150 hover:bg-slate-50 active:scale-[0.96];
+    }
+
+    .btn-danger {
+        @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-rose-50 px-4 text-sm font-semibold text-rose-700 shadow-[inset_0_0_0_1px_rgba(225,29,72,0.16)] transition-transform duration-150 hover:bg-rose-100 active:scale-[0.96];
+    }
+
+    .btn-success {
+        @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 shadow-[inset_0_0_0_1px_rgba(5,150,105,0.16)] transition-transform duration-150 hover:bg-emerald-100 active:scale-[0.96];
+    }
+
+    .status-generated {
+        @apply inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700;
+    }
+
+    .status-draft {
+        @apply inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700;
+    }
+
+    .status-void {
+        @apply inline-flex items-center rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700;
+    }
+}
+
+html[data-workspace-frame='true'] .app-shell {
+    display: block !important;
+    min-height: 0;
+    background: transparent;
+}
+
+html[data-workspace-frame='true'] .app-shell > aside,
+html[data-workspace-frame='true'] [data-workspace-tabs] {
+    display: none !important;
+}
+
+html[data-workspace-frame='true'] .app-shell > main {
+    padding: 1.5rem 1rem;
+}
+
+@media (min-width: 640px) {
+    html[data-workspace-frame='true'] .app-shell > main {
+        padding: 2rem 1.5rem;
+    }
+}
