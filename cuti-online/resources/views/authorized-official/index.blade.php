@@ -31,17 +31,17 @@
                     </div>
                     <div class="sm:col-span-2">
                         <label class="form-label" for="full_name_{{ $role }}">Nama lengkap</label>
-                        <input class="form-input" id="full_name_{{ $role }}" name="full_name" value="{{ old('full_name', $official?->full_name) }}" required>
+                        <input class="form-input" id="full_name_{{ $role }}" name="full_name" value="{{ old('full_name', $official?->full_name) }}" maxlength="255" required>
                         @error('full_name') <p class="form-error">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="form-label" for="nip_{{ $role }}">NIP</label>
-                        <input class="form-input" id="nip_{{ $role }}" name="nip" value="{{ old('nip', $official?->nip) }}">
+                        <input class="form-input" id="nip_{{ $role }}" name="nip" value="{{ old('nip', $official?->nip) }}" maxlength="32">
                         @error('nip') <p class="form-error">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="form-label" for="position_title_{{ $role }}">Jabatan</label>
-                        <input class="form-input" id="position_title_{{ $role }}" name="position_title" value="{{ old('position_title', $official?->position_title) }}" required>
+                        <input class="form-input" id="position_title_{{ $role }}" name="position_title" value="{{ old('position_title', $official?->position_title) }}" maxlength="255" required>
                         @error('position_title') <p class="form-error">{{ $message }}</p> @enderror
                     </div>
                     <div class="sm:col-span-2 flex justify-end">

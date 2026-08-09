@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Department;
 use App\Models\Employee;
 use App\Models\EmployeeImport;
 use App\Models\OrganizationProfile;
@@ -83,6 +84,45 @@ class EmployeeImportTest extends TestCase
             ->assertRedirect(route('employees.index'));
 
         $this->assertDatabaseCount('employees', 1);
+    }
+
+    public function test_import_preserves_the_unit_kerja_provided_in_the_file(): void
+    {
+        $operator = User::factory()->create();
+        $file = UploadedFile::fake()->createWithContent('pegawai-unit-kerja.csv', implode("\n", [
+            'NIP,Nama Lengkap,Status Kepegawaian,Pangkat/Golongan,Unit Kerja,Jabatan',
+            '199001012020011009,Pegawai Kelurahan,PNS,III/b,Kelurahan Akcaya,Jabatan Impor',
+        ]));
+
+        $this->actingAs($operator)
+            ->post(route('employees.import.upload'), ['file' => $file])
+            ->assertRedirect();
+
+        $employeeImport = EmployeeImport::query()->firstOrFail();
+
+        $this->actingAs($operator)
+            ->post(route('employees.import.store', $employeeImport))
+            ->assertRedirect(route('employees.index'));
+
+        $department = Department::query()->where('name', 'Kelurahan Akcaya')->firstOrFail();
+        $employee = Employee::query()->where('nip', '199001012020011009')->firstOrFail();
+
+        $this->assertSame($department->id, $employee->department_id);
+        $this->assertDatabaseHas('employee_position_histories', [
+            'employee_id' => $employee->id,
+            'department_id' => $department->id,
+            'department_name' => 'Kelurahan Akcaya',
+        ]);
+
+        $this->actingAs($operator)
+            ->get(route('employees.show', $employee))
+            ->assertOk()
+            ->assertSee('Kelurahan Akcaya');
+
+        $this->actingAs($operator)
+            ->get(route('employees.edit', $employee))
+            ->assertOk()
+            ->assertSee('Kelurahan Akcaya');
     }
 
     public function test_import_rejects_duplicate_nips_before_any_data_is_created(): void
@@ -242,6 +282,7 @@ class EmployeeImportTest extends TestCase
             $this->assertSame('Data Pegawai', $template->getSheet(0)->getTitle());
             $this->assertSame('NIP', $template->getSheet(0)->getCell('A1')->getValue());
             $this->assertSame('Nama Lengkap', $template->getSheet(0)->getCell('B1')->getValue());
+            $this->assertSame('Unit Kerja', $template->getSheet(0)->getCell('E1')->getValue());
             $template->disconnectWorksheets();
         } finally {
             unlink($templatePath);

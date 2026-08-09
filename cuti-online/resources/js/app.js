@@ -1906,3 +1906,107 @@ document.querySelectorAll('label.form-label[for]').forEach((label) => {
         label.append(asterisk);
     }
 });
+
+const floatingFieldControlSelector = [
+    'input.form-input:not([type="hidden"]):not([type="file"]):not([type="date"]):not([type="time"]):not([type="datetime-local"]):not([type="month"]):not([type="week"]):not([type="color"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="search"]):not([type="number"]):not([readonly])',
+    'textarea.form-textarea:not([readonly])',
+].join(', ');
+
+const isImportManagedField = (control) => Boolean(control.closest?.('[data-import-managed]'));
+
+const floatingFieldSynchronizers = [];
+
+document.querySelectorAll(floatingFieldControlSelector).forEach((control) => {
+    if (isImportManagedField(control)) {
+        return;
+    }
+
+    const fieldContainer = control.parentElement;
+
+    if (!fieldContainer || !control.id) {
+        return;
+    }
+
+    const label = Array.from(fieldContainer.children).find((child) =>
+        child instanceof HTMLLabelElement && child.htmlFor === control.id,
+    );
+
+    if (!label) {
+        return;
+    }
+
+    fieldContainer.classList.add('form-field-floating');
+
+    if (control instanceof HTMLTextAreaElement) {
+        fieldContainer.classList.add('is-textarea');
+    }
+
+    if (!control.getAttribute('placeholder')) {
+        control.setAttribute('placeholder', ' ');
+    }
+
+    const syncFloatingField = () => {
+        fieldContainer.classList.toggle('is-filled', control.value.trim().length > 0);
+    };
+
+    control.addEventListener('input', syncFloatingField);
+    control.addEventListener('change', syncFloatingField);
+    floatingFieldSynchronizers.push(syncFloatingField);
+    syncFloatingField();
+
+    if (control.maxLength < 0 || fieldContainer.querySelector('[data-form-field-counter]')) {
+        return;
+    }
+
+    const counter = document.createElement('span');
+    const updateCounter = () => {
+        counter.textContent = `${control.value.length}/${control.maxLength}`;
+    };
+
+    fieldContainer.classList.add('has-counter');
+    counter.className = 'form-field-counter';
+    counter.dataset.formFieldCounter = '';
+    counter.setAttribute('aria-hidden', 'true');
+    control.addEventListener('input', updateCounter);
+    control.addEventListener('change', updateCounter);
+    updateCounter();
+    fieldContainer.append(counter);
+});
+
+window.addEventListener('pageshow', () => {
+    floatingFieldSynchronizers.forEach((syncFloatingField) => syncFloatingField());
+});
+
+document.querySelectorAll('[data-import-managed]').forEach((section) => {
+    const note = document.createElement('p');
+    note.className = 'mt-2 text-xs text-slate-400';
+    note.textContent = 'Dikelola dari impor Gaji PNS. Tidak dapat diisi atau diubah di sini.';
+    section.querySelector('summary')?.after(note);
+
+    const lockField = (control) => {
+        const isSelect = control.tagName === 'SELECT';
+
+        if (isSelect) {
+            control.disabled = true;
+            Array.from(control.querySelectorAll('option[value=""]')).forEach((opt) => opt.remove());
+        } else {
+            control.readOnly = true;
+        }
+
+        control.classList.add('cursor-not-allowed', 'bg-slate-50', 'text-slate-600');
+
+        control.addEventListener('focus', () => {
+            if (control.readOnly || control.disabled) {
+                control.blur();
+            }
+        });
+    };
+
+    section.querySelectorAll('input, textarea, select').forEach((control) => {
+        if (control.type === 'hidden' || control.type === 'submit') {
+            return;
+        }
+
+        lockField(control);
+    });
+});

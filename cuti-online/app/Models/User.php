@@ -38,6 +38,16 @@ class User extends Authenticatable
         return $this->hasOne(Employee::class);
     }
 
+    public function canViewSensitiveSimpegData(): bool
+    {
+        return in_array(strtolower((string) $this->role), [
+            'admin',
+            'administrator',
+            'pejabat',
+            'simpeg_admin',
+        ], true);
+    }
+
     public function leaveRequests(): HasMany
     {
         return $this->hasMany(LeaveRequest::class, 'created_by');

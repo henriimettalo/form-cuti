@@ -15,7 +15,7 @@ class OrganizationProfileTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_operator_can_set_one_organization_unit_for_all_employees(): void
+    public function test_operator_can_set_an_organization_default_without_changing_existing_employee_units(): void
     {
         $operator = User::factory()->create();
         $firstDepartment = Department::query()->create(['name' => 'Unit Lama Satu', 'is_active' => true]);
@@ -69,11 +69,11 @@ class OrganizationProfileTest extends TestCase
         ]);
         $this->assertDatabaseHas('employees', [
             'id' => $activeEmployee->id,
-            'department_id' => $organizationDepartment->id,
+            'department_id' => $firstDepartment->id,
         ]);
         $this->assertDatabaseHas('employees', [
             'id' => $archivedEmployee->id,
-            'department_id' => $organizationDepartment->id,
+            'department_id' => $secondDepartment->id,
         ]);
         $this->assertDatabaseHas('employee_position_histories', [
             'employee_id' => $activeEmployee->id,

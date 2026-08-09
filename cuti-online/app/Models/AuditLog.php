@@ -17,6 +17,7 @@ class AuditLog extends Model
         'auditable_id',
         'old_values',
         'new_values',
+        'metadata',
         'ip_address',
         'user_agent',
     ];
@@ -26,6 +27,7 @@ class AuditLog extends Model
         return [
             'old_values' => 'array',
             'new_values' => 'array',
+            'metadata' => 'array',
         ];
     }
 

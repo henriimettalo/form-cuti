@@ -7,7 +7,7 @@
         <div>
             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Master data</p>
             <h1 class="page-title mt-2">Pratinjau impor</h1>
-            <p class="page-description">Pastikan data berikut sudah benar. Unit kerja mengikuti Profil Instansi; setelah dikonfirmasi, pegawai, saldo cuti, dan riwayat awal dibuat sekaligus.</p>
+            <p class="page-description">Pastikan data berikut sudah benar. Unit Kerja dari file dipertahankan; jika kosong, Profil Instansi dipakai sebagai bawaan. Setelah dikonfirmasi, pegawai, saldo cuti, dan riwayat awal dibuat sekaligus.</p>
         </div>
         <a class="btn-secondary shrink-0" href="{{ route('employees.import.create') }}">
             <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>

@@ -14,7 +14,10 @@ class EmployeeResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
+        $currentPositionHistory = $this->positionHistories->firstWhere('department_name');
+        $canViewSensitive = $request->user()?->tokenCan('employees:profile') === true;
+
+        $data = [
             'id' => $this->id,
             'nip' => $this->nip,
             'full_name' => $this->full_name,
@@ -28,10 +31,32 @@ class EmployeeResource extends JsonResource
                 'title' => $this->position?->name ?? $this->position_title,
             ],
             'department' => [
-                'id' => $this->department?->id,
-                'name' => $this->department?->name,
+                'id' => $currentPositionHistory?->department_id ?? $this->department?->id,
+                'name' => $currentPositionHistory?->department_name ?? $this->department?->name,
             ],
             'service_started_on' => $this->service_started_on?->toDateString(),
+            'nip_tmt_valid' => $this->nip_tmt_valid,
+            'birth_date' => $this->birth_date?->toDateString(),
+            'gender' => $this->gender,
+            'position_type' => $this->position_type,
+            'position_type_label' => [
+                1 => 'Struktural',
+                3 => 'Fungsional Umum',
+            ][$this->position_type] ?? null,
+            'eselon' => $this->eselon,
+            'marital_status' => $this->marital_status,
+            'marital_status_label' => [
+                1 => 'Menikah',
+                2 => 'Belum menikah',
+            ][$this->marital_status] ?? null,
+            'spouse_count' => $this->spouse_count,
+            'child_count' => $this->child_count,
+            'dependents_count' => $this->spouse_count + $this->child_count,
+            'spouse_is_pns' => $this->spouse_is_pns,
+            'grade_service' => [
+                'years' => $this->grade_service_years,
+                'months' => $this->grade_service_months,
+            ],
             'phone' => $this->phone,
             'email' => $this->email,
             'address' => $this->address,
@@ -39,5 +64,26 @@ class EmployeeResource extends JsonResource
             'created_at' => $this->created_at?->toAtomString(),
             'updated_at' => $this->updated_at?->toAtomString(),
         ];
+
+        if ($canViewSensitive) {
+            $data['sensitive'] = [
+                'nik' => $this->nik,
+                'npwp' => $this->npwp,
+                'spouse_nip' => $this->spouse_nip,
+                'bank_accounts' => $this->whenLoaded(
+                    'bankAccounts',
+                    fn () => $this->bankAccounts->map(static fn ($account): array => [
+                        'bank_code' => $account->bank_code,
+                        'bank_name' => $account->bank_name,
+                        'bank_id' => $account->bank_id,
+                        'account_number' => $account->account_number,
+                        'account_holder_name' => $account->account_holder_name,
+                        'is_primary' => $account->is_primary,
+                    ])->values(),
+                ),
+            ];
+        }
+
+        return $data;
     }
 }

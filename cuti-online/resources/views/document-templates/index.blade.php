@@ -34,7 +34,7 @@
                 @csrf
                 <div>
                     <label class="form-label" for="name">Nama template</label>
-                    <input class="form-input" id="name" name="name" value="{{ old('name') }}" placeholder="Contoh: Formulir Cuti Tahunan 2026">
+                    <input class="form-input" id="name" name="name" value="{{ old('name') }}" maxlength="255" placeholder="Contoh: Formulir Cuti Tahunan 2026">
                     <p class="form-help">Boleh dikosongkan; nama file Word akan digunakan.</p>
                     @error('name') <p class="form-error">{{ $message }}</p> @enderror
                 </div>

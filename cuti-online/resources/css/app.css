@@ -97,6 +97,18 @@
         @apply min-h-11 w-full rounded-xl border-0 bg-slate-100 px-3.5 text-sm text-slate-900 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] outline-none transition-shadow duration-150 placeholder:text-slate-400 focus:bg-white focus:shadow-[inset_0_0_0_2px_rgba(14,165,233,0.6)];
     }
 
+    .form-input[type='file'] {
+        @apply cursor-pointer py-2.5 pr-2.5 text-slate-600;
+    }
+
+    .form-input[type='file']::file-selector-button {
+        @apply mr-3 min-h-8 cursor-pointer rounded-lg border-0 bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-sky-700;
+    }
+
+    .form-input[type='file']::file-selector-button:focus-visible {
+        @apply outline-none ring-2 ring-sky-500 ring-offset-2;
+    }
+
     .date-range-picker {
         @apply rounded-2xl bg-white p-3 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08),0_6px_18px_rgba(15,23,42,0.04)] sm:p-4;
     }
@@ -164,6 +176,65 @@
 
     .form-textarea {
         @apply min-h-28 w-full rounded-xl border-0 bg-slate-100 px-3.5 py-3 text-sm text-slate-900 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] outline-none transition-shadow duration-150 placeholder:text-slate-400 focus:bg-white focus:shadow-[inset_0_0_0_2px_rgba(14,165,233,0.6)];
+    }
+
+    .form-field-floating {
+        @apply relative;
+    }
+
+    .form-field-floating .form-label {
+        @apply pointer-events-none absolute left-3.5 top-1/2 z-10 mb-0 max-w-[calc(100%-6.5rem)] -translate-y-1/2 text-sm font-medium leading-5 text-slate-500;
+        transition-property: top, transform, color, font-size, line-height;
+        transition-duration: 150ms;
+        transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    .form-field-floating .form-input {
+        @apply min-h-14 px-3.5 pb-2 pt-5;
+    }
+
+    .form-field-floating.has-counter .form-input {
+        @apply pr-[4.75rem];
+    }
+
+    .form-field-floating .form-textarea {
+        @apply min-h-32 px-3.5 pb-3 pt-7;
+    }
+
+    .form-field-floating.has-counter .form-textarea {
+        @apply pr-[4.75rem];
+    }
+
+    .form-field-floating .form-input::placeholder,
+    .form-field-floating .form-textarea::placeholder {
+        @apply text-transparent;
+        transition-property: color;
+        transition-duration: 150ms;
+        transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    .form-field-floating:focus-within .form-input::placeholder,
+    .form-field-floating:focus-within .form-textarea::placeholder {
+        @apply text-slate-400;
+    }
+
+    .form-field-floating:focus-within .form-label,
+    .form-field-floating.is-filled .form-label,
+    .form-field-floating.is-textarea .form-label,
+    .form-field-floating:has(.form-input:not(:placeholder-shown)) .form-label,
+    .form-field-floating:has(.form-textarea:not(:placeholder-shown)) .form-label {
+        @apply top-2 translate-y-0 text-[0.6875rem] leading-4 text-sky-700;
+    }
+
+    .form-field-counter {
+        @apply pointer-events-none absolute right-3.5 top-2 z-10 text-xs tabular-nums text-slate-400;
+        transition-property: color;
+        transition-duration: 150ms;
+        transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    .form-field-floating:focus-within .form-field-counter {
+        @apply text-sky-700;
     }
 
     .form-help {

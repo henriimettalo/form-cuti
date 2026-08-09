@@ -9,6 +9,7 @@ use App\Models\EmployeeRankHistory;
 use App\Models\OrganizationProfile;
 use App\Models\Position;
 use App\Services\EmployeeOnboardingService;
+use App\Support\EmployeeNipMetadata;
 use App\Support\EmployeeRankOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -57,7 +58,11 @@ class EmployeeController extends Controller
                 ->when($employmentStatus, static fn ($query, $employmentStatus) => $query->where('employment_status', $employmentStatus))
                 ->when($departmentId, static fn ($query, $departmentId) => $query->where('department_id', $departmentId))
                 ->when($isActive !== null, static fn ($query) => $query->where('is_active', $isActive === '1'))
-                ->with(['department', 'position'])
+                ->with([
+                    'department',
+                    'position',
+                    'positionHistories' => fn ($query) => $query->latest('effective_on')->latest('id'),
+                ])
                 ->latest($showArchived ? 'deleted_at' : 'created_at')
                 ->paginate($perPage)
                 ->withQueryString(),
@@ -72,14 +77,16 @@ class EmployeeController extends Controller
             ],
             'hasFilters' => $search !== '' || $employmentStatus !== null || $departmentId !== null || $isActive !== null,
             'showArchived' => $showArchived,
+            'canBulkDelete' => $request->user()?->canViewSensitiveSimpegData() ?? false,
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
         return view('employees.create', [
             'organizationProfile' => OrganizationProfile::current(),
             'rankGroups' => $this->rankGroups(),
+            'canViewSensitive' => $request->user()?->canViewSensitiveSimpegData() ?? false,
         ]);
     }
 
@@ -91,33 +98,55 @@ class EmployeeController extends Controller
         return to_route('employees.index')->with('status', 'Data pegawai berhasil ditambahkan.');
     }
 
-    public function show(Employee $employee): View
+    public function show(Request $request, Employee $employee): View
     {
         $employee->load([
             'department',
             'position',
             'rankHistories' => fn ($query) => $query->latest('effective_on')->latest('id'),
+            'salaryHistories' => fn ($query) => $query->with('rankHistory')->latest('effective_on')->latest('id'),
             'positionHistories' => fn ($query) => $query->latest('effective_on')->latest('id'),
+            'bankAccounts' => fn ($query) => $query->orderByDesc('is_primary')->orderBy('id'),
+            'payrollRecords' => fn ($query) => $query->with('payrollPeriod')->latest('created_at')->limit(6),
         ]);
 
-        return view('employees.show', compact('employee'));
+        $currentDepartmentName = $employee->positionHistories->firstWhere('department_name')?->department_name
+            ?? $employee->department?->name;
+        $canViewSensitive = $request->user()?->canViewSensitiveSimpegData() ?? false;
+
+        return view('employees.show', compact('employee', 'currentDepartmentName', 'canViewSensitive'));
     }
 
-    public function edit(Employee $employee): View
+    public function edit(Request $request, Employee $employee): View
     {
-        $employee->load(['department', 'position']);
+        $employee->load([
+            'department',
+            'position',
+            'positionHistories' => fn ($query) => $query->latest('effective_on')->latest('id'),
+        ]);
+        $currentDepartmentName = $employee->positionHistories->firstWhere('department_name')?->department_name
+            ?? $employee->department?->name;
 
         return view('employees.edit', [
             'employee' => $employee,
             'organizationProfile' => OrganizationProfile::current(),
+            'currentDepartmentName' => $currentDepartmentName,
             'rankGroups' => $this->rankGroups(),
+            'canViewSensitive' => $request->user()?->canViewSensitiveSimpegData() ?? false,
         ]);
     }
 
     public function update(Request $request, Employee $employee): RedirectResponse
     {
         $data = $this->validateEmployee($request, $employee);
-        [$department, $position] = $this->organizationFor($data);
+
+        if (! ($request->user()?->canViewSensitiveSimpegData() ?? false)) {
+            $data['nik'] = $employee->nik;
+            $data['npwp'] = $employee->npwp;
+            $data['spouse_nip'] = $employee->spouse_nip;
+        }
+
+        [$department, $position] = $this->organizationFor($data, $employee);
         $attributes = $this->employeeAttributes($data, $department, $position);
 
         DB::transaction(function () use ($employee, $attributes, $request): void {
@@ -171,29 +200,68 @@ class EmployeeController extends Controller
             ->with('status', 'Pegawai berhasil dipulihkan dan kembali tampil di daftar aktif.');
     }
 
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()?->canViewSensitiveSimpegData() ?? false, 403);
+
+        $data = $request->validate([
+            'employee_ids' => ['required', 'array', 'min:1'],
+            'employee_ids.*' => ['integer', Rule::exists('employees', 'id')],
+        ]);
+
+        $count = Employee::query()
+            ->whereKey($data['employee_ids'])
+            ->delete();
+
+        $word = $count === 1 ? 'pegawai berhasil diarsipkan' : "{$count} pegawai berhasil diarsipkan";
+
+        return to_route('employees.index')
+            ->with('status', "{$word}. Data dan riwayat tetap tersimpan dan dapat dipulihkan.");
+    }
+
     /**
      * @return array<string, mixed>
      */
     private function validateEmployee(Request $request, ?Employee $employee = null): array
     {
+        $request->merge([
+            'nik' => $this->digitsOrNull($request->input('nik')),
+            'npwp' => $this->digitsOrNull($request->input('npwp')),
+            'spouse_nip' => $this->digitsOrNull($request->input('spouse_nip')),
+        ]);
         $rankOptions = EmployeeRankOptions::optionsFor($request->input('employment_status'));
         $nipRule = Rule::unique('employees', 'nip');
+        $nikRule = Rule::unique('employees', 'nik')->whereNotNull('nik');
 
         if ($employee !== null) {
             $nipRule->ignore($employee);
+            $nikRule->ignore($employee);
         }
 
         $data = $request->validate([
             'nip' => ['required', 'string', 'max:32', $nipRule],
+            'nik' => ['nullable', 'digits:16', $nikRule],
+            'npwp' => ['nullable', 'digits_between:15,16'],
             'full_name' => ['required', 'string', 'max:255'],
-            'position_title' => ['required', 'string', 'max:255'],
+            'position_title' => ['nullable', 'string', 'max:255'],
+            'position_type' => ['nullable', 'integer', Rule::in([1, 3])],
+            'eselon' => ['nullable', 'string', 'max:8', 'regex:/^[0-9A-Za-z\/-]+$/'],
             'rank_grade' => [
                 'nullable',
                 Rule::requiredIf($request->input('employment_status') === 'PNS'),
                 Rule::in(array_keys($rankOptions)),
             ],
-            'employment_status' => ['required', 'string', 'max:32'],
+            'employment_status' => ['nullable', 'string', Rule::in(['PNS', 'PPPK', 'Lainnya'])],
+            'marital_status' => ['nullable', 'integer', Rule::in([1, 2])],
+            'spouse_count' => ['nullable', 'integer', 'min:0', 'max:255'],
+            'child_count' => ['nullable', 'integer', 'min:0', 'max:255'],
+            'spouse_is_pns' => ['nullable', 'boolean'],
+            'spouse_nip' => ['nullable', 'string', 'max:32'],
+            'birth_date' => ['nullable', 'date'],
             'service_started_on' => ['nullable', 'date'],
+            'grade_service_years' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'grade_service_months' => ['nullable', 'integer', 'min:0', 'max:11'],
+            'gender' => ['nullable', Rule::in(['L', 'P'])],
             'phone' => ['nullable', 'digits_between:8,15'],
             'email' => ['nullable', 'email', 'max:255'],
             'address' => ['nullable', 'string'],
@@ -202,6 +270,14 @@ class EmployeeController extends Controller
 
         $data['rank_name'] = $rank['name'] ?? null;
         $data['grade'] = $rank['grade'] ?? null;
+        $derived = EmployeeNipMetadata::derive($data['nip']);
+        $data['gender'] = $data['gender'] ?? $derived['gender'];
+        $data['birth_date'] = $data['birth_date'] ?? $derived['birth_date'];
+        $data['service_started_on'] = $data['service_started_on'] ?? $derived['service_started_on'];
+        $data['nip_tmt_valid'] = $derived['tmt_valid'];
+        $data['eselon'] = $data['eselon'] ?? '00';
+        $data['spouse_count'] = (int) ($data['spouse_count'] ?? 0);
+        $data['child_count'] = (int) ($data['child_count'] ?? 0);
 
         return $data;
     }
@@ -219,15 +295,18 @@ class EmployeeController extends Controller
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{Department, Position}
+     * @return array{Department, ?Position}
      */
-    private function organizationFor(array $data): array
+    private function organizationFor(array $data, ?Employee $employee = null): array
     {
-        $department = OrganizationProfile::current()->resolveDepartment();
-        $position = Position::query()->firstOrCreate(
-            ['name' => trim($data['position_title'])],
-            ['is_active' => true],
-        );
+        $department = $employee?->department ?? OrganizationProfile::current()->resolveDepartment();
+        $positionTitle = trim((string) ($data['position_title'] ?? ''));
+        $position = $positionTitle === ''
+            ? $employee?->position
+            : Position::query()->firstOrCreate(
+                ['name' => $positionTitle],
+                ['is_active' => true],
+            );
 
         return [$department, $position];
     }
@@ -236,22 +315,43 @@ class EmployeeController extends Controller
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function employeeAttributes(array $data, Department $department, Position $position): array
+    private function employeeAttributes(array $data, Department $department, ?Position $position): array
     {
         return [
             'department_id' => $department->id,
-            'position_id' => $position->id,
+            'position_id' => $position?->id,
             'nip' => $data['nip'],
+            'nik' => $data['nik'] ?? null,
+            'npwp' => $data['npwp'] ?? null,
             'full_name' => $data['full_name'],
-            'position_title' => $data['position_title'],
+            'position_title' => $position?->name,
+            'position_type' => $data['position_type'] ?? null,
+            'eselon' => $data['eselon'] ?? '00',
             'rank_name' => $data['rank_name'],
             'grade' => $data['grade'],
-            'employment_status' => $data['employment_status'],
+            'employment_status' => $data['employment_status'] ?? null,
+            'marital_status' => $data['marital_status'] ?? null,
+            'spouse_count' => $data['spouse_count'] ?? 0,
+            'child_count' => $data['child_count'] ?? 0,
+            'spouse_is_pns' => $data['spouse_is_pns'] ?? null,
+            'spouse_nip' => $data['spouse_nip'] ?? null,
+            'birth_date' => $data['birth_date'] ?? null,
             'service_started_on' => $data['service_started_on'] ?? null,
+            'nip_tmt_valid' => $data['nip_tmt_valid'] ?? null,
+            'grade_service_years' => $data['grade_service_years'] ?? null,
+            'grade_service_months' => $data['grade_service_months'] ?? null,
+            'gender' => $data['gender'] ?? null,
             'phone' => $data['phone'] ?? null,
             'email' => $data['email'] ?? null,
             'address' => $data['address'] ?? null,
         ];
+    }
+
+    private function digitsOrNull(mixed $value): ?string
+    {
+        $digits = EmployeeNipMetadata::digits($value === null ? null : (string) $value);
+
+        return $digits === '' ? null : $digits;
     }
 
     private function recordRankHistory(

@@ -27,7 +27,7 @@
 
                     <div>
                         <label class="form-label" for="email">Email</label>
-                        <input class="form-input" id="email" type="email" name="email" value="{{ old('email') }}" autocomplete="email" required autofocus>
+                        <input class="form-input" id="email" type="email" name="email" value="{{ old('email') }}" maxlength="255" autocomplete="email" required autofocus>
                     </div>
                     <div class="mt-4">
                         <label class="form-label" for="password">Kata sandi</label>

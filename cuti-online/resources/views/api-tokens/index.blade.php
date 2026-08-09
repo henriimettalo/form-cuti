@@ -40,7 +40,7 @@
 
                 <div>
                     <label class="form-label" for="name">Nama integrasi</label>
-                    <input class="form-input" id="name" name="name" value="{{ old('name') }}" placeholder="Contoh: Sistem Absensi" required>
+                    <input class="form-input" id="name" name="name" value="{{ old('name') }}" maxlength="100" placeholder="Contoh: Sistem Absensi" required>
                     <p class="form-help">Gunakan nama sistem atau layanan yang akan memakai token ini.</p>
                     @error('name') <p class="form-error">{{ $message }}</p> @enderror
                 </div>

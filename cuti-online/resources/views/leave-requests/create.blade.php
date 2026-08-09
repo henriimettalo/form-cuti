@@ -87,7 +87,7 @@
                 </div>
                 <div class="md:col-span-2">
                     <label class="form-label" for="reason">Alasan cuti</label>
-                    <textarea class="form-textarea" id="reason" name="reason" required placeholder="Contoh: Cuti Tahunan">{{ old('reason') }}</textarea>
+                    <textarea class="form-textarea" id="reason" name="reason" maxlength="2000" required placeholder="Contoh: Cuti Tahunan">{{ old('reason') }}</textarea>
                     @error('reason') <p class="form-error">{{ $message }}</p> @enderror
                 </div>
             </div>
@@ -135,11 +135,11 @@
                 </div>
                 <div class="md:col-span-2">
                     <label class="form-label" for="address_during_leave">Alamat selama menjalankan cuti</label>
-                    <textarea class="form-textarea" id="address_during_leave" name="address_during_leave">{{ old('address_during_leave') }}</textarea>
+                    <textarea class="form-textarea" id="address_during_leave" name="address_during_leave" maxlength="2000">{{ old('address_during_leave') }}</textarea>
                 </div>
                 <div>
                     <label class="form-label" for="phone_during_leave">Nomor telepon selama cuti</label>
-                    <input class="form-input" id="phone_during_leave" name="phone_during_leave" value="{{ old('phone_during_leave') }}" required>
+                    <input class="form-input" id="phone_during_leave" type="tel" inputmode="numeric" name="phone_during_leave" value="{{ old('phone_during_leave') }}" maxlength="15" required>
                 </div>
             </div>
 

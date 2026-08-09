@@ -16,7 +16,6 @@ Route::prefix('v1')
         Route::post('/employees', [EmployeeController::class, 'store'])
             ->middleware('abilities:employees:write')
             ->name('api.v1.employees.store');
-
         Route::get('/leave-requests', [LeaveRequestController::class, 'index'])
             ->middleware('abilities:leave-requests:read')
             ->name('api.v1.leave-requests.index');

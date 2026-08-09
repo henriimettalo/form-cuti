@@ -23,12 +23,12 @@
         <div class="mt-7 grid gap-5 md:grid-cols-2">
             <div>
                 <label class="form-label" for="organization_name">Unit kerja</label>
-                <div class="form-input flex min-h-11 items-center bg-slate-50 text-slate-700" id="organization_name" role="status" aria-label="Unit kerja aplikasi">{{ $organizationProfile->name }}</div>
-                <p class="form-help text-pretty">Dikelola melalui <a class="font-semibold text-sky-700 underline underline-offset-2" href="{{ route('organization-profile.index') }}">Profil Instansi</a>.</p>
+                <div class="form-input flex min-h-11 items-center bg-slate-50 text-slate-700" id="organization_name" role="status" aria-label="Unit kerja pegawai">{{ $currentDepartmentName ?? $employee->department?->name ?? $organizationProfile->name }}</div>
+                <p class="form-help text-pretty">Mengikuti unit kerja aktif pegawai. Profil Instansi hanya dipakai sebagai bawaan jika unit kerja belum tersedia.</p>
             </div>
             <div>
                 <label class="form-label" for="position_title">Jabatan baru</label>
-                <input class="form-input" id="position_title" name="position_title" value="{{ old('position_title', $employee->position?->name ?? $employee->position_title) }}" required>
+                <input class="form-input" id="position_title" name="position_title" value="{{ old('position_title', $employee->position?->name ?? $employee->position_title) }}" maxlength="255" required>
                 @error('position_title') <p class="form-error">{{ $message }}</p> @enderror
             </div>
             <div>
@@ -38,12 +38,12 @@
             </div>
             <div>
                 <label class="form-label" for="decree_number">Nomor SK</label>
-                <input class="form-input" id="decree_number" name="decree_number" value="{{ old('decree_number') }}" placeholder="Opsional">
+                <input class="form-input" id="decree_number" name="decree_number" value="{{ old('decree_number') }}" maxlength="100" placeholder="Opsional">
                 @error('decree_number') <p class="form-error">{{ $message }}</p> @enderror
             </div>
             <div class="md:col-span-2">
                 <label class="form-label" for="notes">Keterangan</label>
-                <textarea class="form-textarea" id="notes" name="notes" placeholder="Contoh: Mutasi internal">{{ old('notes') }}</textarea>
+                <textarea class="form-textarea" id="notes" name="notes" maxlength="1000" placeholder="Contoh: Mutasi internal">{{ old('notes') }}</textarea>
                 @error('notes') <p class="form-error">{{ $message }}</p> @enderror
             </div>
         </div>

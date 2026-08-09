@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Employee;
 use App\Models\OrganizationProfile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,12 +26,10 @@ class OrganizationProfileController extends Controller
         DB::transaction(function () use ($data): void {
             $organizationProfile = OrganizationProfile::current();
             $organizationProfile->update(['name' => trim($data['name'])]);
-            $department = $organizationProfile->resolveDepartment();
-
-            Employee::withTrashed()->update(['department_id' => $department->id]);
+            $organizationProfile->resolveDepartment();
         });
 
         return to_route('organization-profile.index')
-            ->with('status', 'Profil instansi berhasil disimpan dan unit kerja seluruh pegawai telah disamakan.');
+            ->with('status', 'Profil instansi berhasil disimpan sebagai unit kerja bawaan untuk data baru.');
     }
 }

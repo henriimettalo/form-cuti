@@ -28,9 +28,17 @@
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m3 13 9-9 9 9M5 11v9a1 1 0 0 0 1 1h3v-6h6v6h3a1 1 0 0 0 1-1v-9" /></svg>
                         Dashboard
                     </a>
-                    <a class="sidebar-link {{ request()->routeIs('employees.*') ? 'sidebar-link-active' : '' }}" href="{{ route('employees.index') }}" data-workspace-link data-workspace-title="Pegawai">
+                    <a class="sidebar-link {{ request()->routeIs('employees.*') && ! request()->routeIs('employees.change-logs.*') ? 'sidebar-link-active' : '' }}" href="{{ route('employees.index') }}" data-workspace-link data-workspace-title="Pegawai">
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19a6 6 0 0 0-12 0m6-8a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm6 3a4 4 0 0 1 4 4m-4-7a3 3 0 1 0 0-6" /></svg>
                         Pegawai
+                    </a>
+                    <a class="sidebar-link {{ request()->routeIs('employees.change-logs.*') ? 'sidebar-link-active' : '' }}" href="{{ route('employees.change-logs.index') }}" data-workspace-link data-workspace-title="Log Perubahan Pegawai">
+                        <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m5-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                        Log perubahan
+                    </a>
+                    <a class="sidebar-link {{ request()->routeIs('payroll.*') ? 'sidebar-link-active' : '' }}" href="{{ route('payroll.index') }}" data-workspace-link data-workspace-title="Payroll Bulanan">
+                        <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75A2.25 2.25 0 0 1 6.75 4.5h10.5a2.25 2.25 0 0 1 2.25 2.25v10.5a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25V6.75Zm0 3.75h15M8.25 14.25h2.25m2.25 0H15m-6.75 3h2.25m2.25 0H15" /></svg>
+                        Payroll Bulanan
                     </a>
                     <p class="hidden px-2 pb-1 pt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 lg:block">Layanan cuti</p>
                     <a class="sidebar-link {{ request()->routeIs('leave-requests.*') ? 'sidebar-link-active' : '' }}" href="{{ route('leave-requests.index') }}" data-workspace-link data-workspace-title="Formulir Cuti">
@@ -102,11 +110,30 @@
                             </div>
                         @endif
 
-                        @if ($errors->any())
+                        @php
+                            $errorMessages = [];
+
+                            if (is_object($errors) && method_exists($errors, 'getBags')) {
+                                foreach ($errors->getBags() as $bag) {
+                                    $errorMessages = array_merge(
+                                        $errorMessages,
+                                        is_object($bag) && method_exists($bag, 'all')
+                                            ? $bag->all()
+                                            : collect($bag)->flatten()->all(),
+                                    );
+                                }
+                            } elseif (is_object($errors) && method_exists($errors, 'all')) {
+                                $errorMessages = $errors->all();
+                            } else {
+                                $errorMessages = collect($errors)->flatten()->all();
+                            }
+                        @endphp
+
+                        @if ($errorMessages !== [])
                             <div class="mb-6 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-800 shadow-[inset_0_0_0_1px_rgba(225,29,72,0.14)]">
                                 <p class="font-semibold">Periksa kembali data yang diisi.</p>
                                 <ul class="mt-1 list-inside list-disc text-rose-700">
-                                    @foreach ($errors->all() as $error)
+                                    @foreach ($errorMessages as $error)
                                         <li>{{ $error }}</li>
                                     @endforeach
                                 </ul>

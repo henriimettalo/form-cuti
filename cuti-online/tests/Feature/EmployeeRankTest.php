@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Department;
 use App\Models\Employee;
-use App\Models\OrganizationProfile;
 use App\Models\Position;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -123,11 +122,11 @@ class EmployeeRankTest extends TestCase
 
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
+            'department_id' => $department->id,
             'position_title' => 'Jabatan Baru',
             'rank_name' => 'Pembina',
             'grade' => 'IV/a',
         ]);
-        $this->assertDatabaseHas('departments', ['name' => OrganizationProfile::current()->name]);
         $this->assertDatabaseHas('positions', ['name' => 'Jabatan Baru']);
         $this->assertDatabaseHas('employee_rank_histories', [
             'employee_id' => $employee->id,
@@ -136,7 +135,7 @@ class EmployeeRankTest extends TestCase
         ]);
         $this->assertDatabaseHas('employee_position_histories', [
             'employee_id' => $employee->id,
-            'department_name' => OrganizationProfile::current()->name,
+            'department_name' => 'Unit Lama',
             'position_title' => 'Jabatan Baru',
             'notes' => 'Perubahan melalui edit data pegawai.',
         ]);

@@ -7,7 +7,7 @@
         <div class="min-w-0">
             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">{{ $showArchived ? 'Arsip data' : 'Master data' }}</p>
             <h1 class="page-title mt-2">{{ $showArchived ? 'Arsip pegawai' : 'Pegawai' }}</h1>
-            <p class="page-description">{{ $showArchived ? 'Data pegawai yang diarsipkan tidak dapat dipilih pada formulir cuti, tetapi tetap dapat dipulihkan kapan saja.' : 'Kelola profil, pangkat, dan jabatan. Unit kerja mengikuti Profil Instansi, lalu modul cuti memakai data aktif dari sini.' }}</p>
+            <p class="page-description">{{ $showArchived ? 'Data pegawai yang diarsipkan tidak dapat dipilih pada formulir cuti, tetapi tetap dapat dipulihkan kapan saja.' : 'Kelola profil, pangkat, jabatan, dan unit kerja pegawai. Modul cuti memakai data aktif dari sini.' }}</p>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
             @if ($showArchived)
@@ -20,9 +20,12 @@
                     <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 7.5V6A2.25 2.25 0 0 1 6 3.75h12A2.25 2.25 0 0 1 20.25 6v1.5M3.75 7.5h16.5m-16.5 0v10.75A2.25 2.25 0 0 0 6 20.5h12a2.25 2.25 0 0 0 2.25-2.25V7.5" /></svg>
                     Arsip pegawai
                 </a>
-                <a class="btn-secondary shrink-0" href="{{ route('employees.import.create') }}">
+                <a class="btn-secondary shrink-0" href="{{ route('employees.identity-import.create') }}">
                     <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5v-9m0 9 3.75-3.75M12 16.5 8.25 12.75M4.5 18.75v.75A1.5 1.5 0 0 0 6 21h12a1.5 1.5 0 0 0 1.5-1.5v-.75" /></svg>
-                    Impor pegawai
+                    Impor identitas
+                </a>
+                <a class="btn-secondary shrink-0" href="{{ route('employees.change-logs.index') }}">
+                    Log perubahan
                 </a>
                 <a class="btn-primary shrink-0" href="{{ route('employees.create') }}">
                     <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
@@ -124,29 +127,65 @@
                     </div>
                 </div>
             </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-left text-sm">
-                    <thead class="text-xs uppercase tracking-[0.08em] text-slate-400">
+            @if ($canBulkDelete && ! $showArchived)
+                <div data-bulk-action-bar class="mb-4 hidden flex-col gap-3 rounded-2xl bg-rose-50/80 px-4 py-4 text-sm text-rose-900 shadow-[inset_0_0_0_1px_rgba(225,29,72,0.16),0_4px_12px_rgba(225,29,72,0.04)] sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <span aria-hidden="true" class="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/80 text-rose-700 shadow-[inset_0_0_0_1px_rgba(225,29,72,0.12)]">
+                            <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m9 12 2 2 4-4m5-2.5a9 9 0 1 1-16 0 9 9 0 0 1 16 0Z" /></svg>
+                        </span>
+                        <span class="font-semibold" aria-live="polite"><span data-bulk-action-count class="tabular-nums">0</span> pegawai dipilih</span>
+                    </div>
+                    <div class="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center">
+                        <button type="button" class="min-h-11 w-full rounded-lg px-3 text-sm font-medium text-slate-600 transition-[background-color,color,transform] duration-150 hover:bg-white/80 hover:text-slate-950 active:scale-[0.96] sm:w-auto" data-bulk-action-clear>Bersihkan pilihan</button>
+                        <button type="submit" class="btn-danger w-full sm:w-auto" form="employee-bulk-form" onclick="return confirm('Arsipkan pegawai yang dipilih? Data dan riwayat tetap tersimpan dan dapat dipulihkan.')">
+                            Arsipkan terpilih
+                        </button>
+                    </div>
+                </div>
+                <form id="employee-bulk-form" method="POST" action="{{ route('employees.bulk-destroy') }}">
+                    @csrf
+                    @method('DELETE')
+                </form>
+            @endif
+            <div class="overflow-x-auto pb-1">
+                <table class="min-w-[76rem] w-full text-left text-sm">
+                    <thead class="sticky top-0 z-10 bg-white/95 text-xs uppercase tracking-[0.08em] text-slate-400 backdrop-blur">
                         <tr>
-                            <th class="pb-3 pr-5 font-semibold">Pegawai</th>
-                            <th class="pb-3 pr-5 font-semibold">NIP</th>
-                            <th class="pb-3 pr-5 font-semibold">Pangkat</th>
-                            <th class="pb-3 pr-5 font-semibold">Jabatan</th>
-                            <th class="pb-3 pr-5 font-semibold">Unit kerja</th>
-                            <th class="pb-3 pr-5 font-semibold">Status</th>
-                            <th class="pb-3 text-right font-semibold">Aksi</th>
+                            @if ($canBulkDelete && ! $showArchived)
+                                <th class="w-14 pb-3 pr-3 text-center align-middle">
+                                    <label class="inline-flex size-10 cursor-pointer items-center justify-center rounded-xl text-sky-700 transition-[background-color,box-shadow,transform] duration-150 hover:bg-sky-50 focus-within:bg-sky-50 focus-within:shadow-[inset_0_0_0_1px_rgba(2,132,199,0.2)] active:scale-[0.96]" title="Pilih semua pegawai">
+                                        <input class="size-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" type="checkbox" data-bulk-select-all>
+                                        <span class="sr-only">Pilih semua pegawai</span>
+                                    </label>
+                                </th>
+                            @endif
+                            <th class="min-w-64 whitespace-nowrap pb-3 pr-6 font-semibold">Pegawai</th>
+                            <th class="min-w-40 whitespace-nowrap pb-3 pr-6 font-semibold">NIP</th>
+                            <th class="min-w-48 whitespace-nowrap pb-3 pr-6 font-semibold">Pangkat</th>
+                            <th class="min-w-44 whitespace-nowrap pb-3 pr-6 font-semibold">Jabatan</th>
+                            <th class="min-w-48 whitespace-nowrap pb-3 pr-6 font-semibold">Unit kerja</th>
+                            <th class="min-w-24 whitespace-nowrap pb-3 pr-6 font-semibold">Status</th>
+                            <th class="w-16 whitespace-nowrap pb-3 text-right font-semibold">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         @foreach ($employees as $employee)
-                            <tr>
-                                <td class="py-4 pr-5 font-semibold text-slate-800">{{ $employee->full_name }}</td>
-                                <td class="py-4 pr-5 font-mono text-xs text-slate-600">{{ $employee->nip }}</td>
-                                <td class="py-4 pr-5 text-slate-600">{{ \App\Support\EmployeeRankOptions::format($employee->employment_status, $employee->rank_name, $employee->grade) }}</td>
-                                <td class="py-4 pr-5 text-slate-600">{{ $employee->position?->name ?? $employee->position_title }}</td>
-                                <td class="py-4 pr-5 text-slate-600">{{ $employee->department?->name ?? '-' }}</td>
-                                <td class="py-4 pr-5"><span class="{{ $showArchived ? 'status-void' : ($employee->is_active ? 'status-generated' : 'status-void') }}">{{ $showArchived ? 'Diarsipkan' : ($employee->is_active ? 'Aktif' : 'Nonaktif') }}</span></td>
-                                <td class="py-4 text-right">
+                            <tr data-bulk-row class="transition-colors duration-150 hover:bg-slate-50">
+                                @if ($canBulkDelete && ! $showArchived)
+                                    <td class="w-14 py-3 pr-3 text-center align-middle">
+                                        <label class="inline-flex size-10 cursor-pointer items-center justify-center rounded-xl text-sky-700 transition-[background-color,box-shadow,transform] duration-150 hover:bg-sky-50 focus-within:bg-sky-50 focus-within:shadow-[inset_0_0_0_1px_rgba(2,132,199,0.2)] active:scale-[0.96]">
+                                            <input class="size-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" type="checkbox" name="employee_ids[]" value="{{ $employee->id }}" data-bulk-select>
+                                            <span class="sr-only">Pilih {{ $employee->full_name }}</span>
+                                        </label>
+                                    </td>
+                                @endif
+                                <td class="py-3.5 pr-6 align-middle font-semibold leading-6 text-slate-800">{{ $employee->full_name }}</td>
+                                <td class="whitespace-nowrap py-3.5 pr-6 align-middle font-mono text-xs tabular-nums text-slate-600">{{ $employee->nip }}</td>
+                                <td class="py-3.5 pr-6 align-middle leading-6 text-slate-600">{{ \App\Support\EmployeeRankOptions::format($employee->employment_status, $employee->rank_name, $employee->grade) }}</td>
+                                <td class="py-3.5 pr-6 align-middle leading-6 text-slate-600">{{ $employee->position?->name ?? $employee->position_title }}</td>
+                                <td class="py-3.5 pr-6 align-middle leading-6 text-slate-600">{{ $employee->positionHistories->firstWhere('department_name')?->department_name ?? $employee->department?->name ?? '-' }}</td>
+                                <td class="whitespace-nowrap py-3.5 pr-6 align-middle"><span class="{{ $showArchived ? 'status-void' : ($employee->is_active ? 'status-generated' : 'status-void') }}">{{ $showArchived ? 'Diarsipkan' : ($employee->is_active ? 'Aktif' : 'Nonaktif') }}</span></td>
+                                <td class="py-3.5 text-right align-middle">
                                     <div class="inline-block text-left" data-employee-actions>
                                         <button class="inline-flex size-11 items-center justify-center rounded-xl bg-white text-slate-600 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.1)] transition-[background-color,box-shadow,transform] duration-150 hover:bg-slate-50 hover:text-slate-950 active:scale-[0.96]" type="button" data-employee-actions-toggle aria-expanded="false" aria-controls="employee-actions-{{ $employee->id }}" aria-label="Aksi untuk {{ $employee->full_name }}" title="Aksi pegawai">
                                             <svg aria-hidden="true" class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75h.008v.008H12V6.75Zm0 5.246h.008v.008H12v-.008Zm0 5.246h.008v.008H12v-.008Z" /></svg>
@@ -192,4 +231,88 @@
             <div class="mt-5">{{ $employees->links() }}</div>
         @endif
     </section>
+
+    @if ($canBulkDelete && ! $showArchived)
+        <script>
+            (function () {
+                const selectAll = document.querySelector('[data-bulk-select-all]');
+                const checkboxes = Array.from(document.querySelectorAll('[data-bulk-select]'));
+                const bulkForm = document.getElementById('employee-bulk-form');
+                const bar = document.querySelector('[data-bulk-action-bar]');
+                const countEl = document.querySelector('[data-bulk-action-count]');
+                const clearBtn = document.querySelector('[data-bulk-action-clear]');
+
+                if (!bulkForm || checkboxes.length === 0) {
+                    return;
+                }
+
+                const selected = () => checkboxes.filter((cb) => cb.checked);
+
+                const syncRow = (checkbox) => {
+                    const row = checkbox.closest('[data-bulk-row]');
+
+                    if (!row) {
+                        return;
+                    }
+
+                    row.classList.toggle('bg-sky-50', checkbox.checked);
+                    row.classList.toggle('hover:bg-sky-100', checkbox.checked);
+                    row.classList.toggle('hover:bg-slate-50', ! checkbox.checked);
+                };
+
+                const syncBar = () => {
+                    const count = selected().length;
+                    countEl.textContent = String(count);
+                    bar.classList.toggle('hidden', count === 0);
+                    bar.classList.toggle('flex', count > 0);
+
+                    checkboxes.forEach(syncRow);
+
+                    if (selectAll) {
+                        selectAll.checked = count !== 0 && count === checkboxes.length;
+                        selectAll.indeterminate = count > 0 && count < checkboxes.length;
+                    }
+                };
+
+                checkboxes.forEach((cb) => cb.addEventListener('change', syncBar));
+
+                if (selectAll) {
+                    selectAll.addEventListener('change', () => {
+                        checkboxes.forEach((cb) => { cb.checked = selectAll.checked; });
+                        syncBar();
+                    });
+                }
+
+                if (clearBtn) {
+                    clearBtn.addEventListener('click', () => {
+                        checkboxes.forEach((cb) => { cb.checked = false; });
+                        syncBar();
+                    });
+                }
+
+                syncBar();
+
+                bulkForm.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    const ids = selected().map((cb) => cb.value);
+
+                    if (ids.length === 0) {
+                        return;
+                    }
+
+                    bulkForm.querySelectorAll('input[name="employee_ids[]"]').forEach((input) => input.remove());
+
+                    ids.forEach((id) => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'employee_ids[]';
+                        input.value = id;
+                        bulkForm.append(input);
+                    });
+
+                    bulkForm.submit();
+                });
+            })();
+        </script>
+    @endif
 @endsection

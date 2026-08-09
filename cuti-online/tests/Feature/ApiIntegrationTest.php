@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\EmployeeBankAccount;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\OrganizationProfile;
@@ -40,6 +41,37 @@ class ApiIntegrationTest extends TestCase
             ->getJson(route('api.v1.employees.show', ['employee' => $employee->nip]))
             ->assertOk()
             ->assertJsonPath('data.full_name', 'Pegawai API');
+    }
+
+    public function test_profile_ability_is_required_for_sensitive_employee_data(): void
+    {
+        $user = User::factory()->create();
+        $employee = $this->createEmployee('199001012020011107', 'Pegawai Profil API');
+        $employee->update([
+            'nik' => '6171052401900001',
+            'npwp' => '123456789012345',
+            'birth_date' => '1990-01-01',
+        ]);
+        EmployeeBankAccount::query()->create([
+            'employee_id' => $employee->id,
+            'bank_code' => '123',
+            'bank_name' => 'Bank Contoh',
+            'account_number' => '001234',
+            'is_primary' => true,
+        ]);
+
+        $this->withToken($this->tokenFor($user, ['employees:read']))
+            ->getJson(route('api.v1.employees.show', ['employee' => $employee->nip]))
+            ->assertOk()
+            ->assertJsonMissingPath('data.sensitive')
+            ->assertJsonPath('data.birth_date', '1990-01-01');
+
+        $this->app['auth']->forgetGuards();
+        $this->withToken($this->tokenFor($user, ['employees:read', 'employees:profile']))
+            ->getJson(route('api.v1.employees.show', ['employee' => $employee->nip]))
+            ->assertOk()
+            ->assertJsonPath('data.sensitive.nik', '6171052401900001')
+            ->assertJsonPath('data.sensitive.bank_accounts.0.account_number', '001234');
     }
 
     public function test_token_without_the_required_ability_is_forbidden(): void
@@ -127,6 +159,24 @@ class ApiIntegrationTest extends TestCase
             ->getJson(route('api.v1.leave-requests.show', ['leaveRequest' => $leaveRequest->public_id]))
             ->assertOk()
             ->assertJsonPath('data.reason', 'Keperluan keluarga.');
+    }
+
+    public function test_employee_api_does_not_expose_salary_or_payroll_data(): void
+    {
+        $user = User::factory()->create();
+        $employee = $this->createEmployee('199001012020011104', 'Pegawai Data Master API');
+        $token = $this->tokenFor($user, ['employees:read']);
+
+        $this->withToken($token)
+            ->getJson(route('api.v1.employees.show', ['employee' => $employee->nip]))
+            ->assertOk()
+            ->assertJsonMissingPath('data.basic_salary')
+            ->assertJsonMissingPath('data.tunjangan_keluarga')
+            ->assertJsonMissingPath('data.payroll');
+
+        $this->withToken($token)
+            ->getJson('/api/v1/employees/'.$employee->nip.'/salary-history')
+            ->assertNotFound();
     }
 
     public function test_operator_can_create_and_revoke_only_their_own_api_token(): void

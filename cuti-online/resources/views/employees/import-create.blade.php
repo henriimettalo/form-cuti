@@ -21,7 +21,7 @@
         <div class="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
                 <h2 class="section-heading">Mulai dari template</h2>
-                <p class="section-description">Template menjaga urutan kolom, format NIP, dan format tanggal tetap benar. Unit kerja diisi otomatis dari Profil Instansi.</p>
+                <p class="section-description">Template menjaga urutan kolom, format NIP, dan format tanggal tetap benar. Kolom Unit Kerja opsional; jika diisi, datanya dipertahankan.</p>
             </div>
             <a class="btn-secondary shrink-0" href="{{ route('employees.import.template') }}">
                 <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5v-9m0 9 3.75-3.75M12 16.5 8.25 12.75M4.5 18.75v.75A1.5 1.5 0 0 0 6 21h12a1.5 1.5 0 0 0 1.5-1.5v-.75" /></svg>

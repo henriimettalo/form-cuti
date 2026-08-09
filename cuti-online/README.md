@@ -1,58 +1,108 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# SIMPEG Cuti Online — Sistem Kepegawaian & Cuti Kecamatan
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplikasi web pengelolaan data pegawai, pengajuan cuti, dan payroll untuk lingkungan pemerintahan kecamatan. Dibangun dengan Laravel + SQLite.
 
-## About Laravel
+## Fitur
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Master Pegawai** — kelola identitas pegawai (NIP, nama, jabatan, kontak), import identitas dari Excel (NIP+nama saja), arsip/pulihkan, bulk archive.
+- **Cuti** — buat formulir cuti tahunan, hitung durasi otomatis, snapshot data pegawai + pejabat penandatangan, generate dokumen Word (.docx) dari template.
+- **Pejabat berwenang** — kelola pejabat penandatangan: Pejabat Berwenang, Sekda, Wali Kota. Khusus pemohon Camat, atasan & pejabat berwenang otomatis diisi; dukungan PLH.
+- **Payroll** — import gaji utama (Gaji PNS) + pelengkap TPP dari Excel, per periode bulanan. Update data master pegawai dari file, rekonsiliasi total, ekspor/slip.
+- **Template dokumen** — unggah template Word formulir cuti.
+- **Profil instansi** — nama instansi dipakai pada formulir.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Persyaratan
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- PHP 8.2+
+- Composer
+- Node.js 18+ (untuk build aset Vite)
+- SQLite (default) atau PostgreSQL
 
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Instalasi
 
 ```bash
-composer require laravel/boost --dev
+# 1. Clone / salin folder project
 
-php artisan boost:install
+# 2. Install dependensi
+composer install
+npm install
+
+# 3. Siapkan environment
+cp .env.example .env
+php artisan key:generate
+
+# 4. Konfigurasi .env (sesuaikan nama instansi, DB, dsb.)
+#    APP_NAME=NamaInstansi
+
+# 5. Migrasi + seed data awal (jenis cuti)
+php artisan migrate
+php artisan db:seed
+
+# 6. Build aset frontend
+npm run build
+# atau saat pengembangan: npm run dev
+
+# 7. Jalankan server
+php artisan serve
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Buka `http://127.0.0.1:8000`.
 
-## Contributing
+## Membuat akun admin
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Tidak ada seeder akun. Buat pengguna lewat `php artisan tinker`:
 
-## Code of Conduct
+```php
+php artisan tinker
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+App\Models\User::create([
+    'name' => 'Admin',
+    'email' => 'admin@example.go.id',
+    'password' => bcrypt('password'),
+    'role' => 'admin',
+]);
+```
 
-## Security Vulnerabilities
+Role yang diakui untuk akses data sensitif & bulk delete: `admin`, `administrator`, `pejabat`, `simpeg_admin`.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Alur kerja umum
 
-## License
+1. **Isi Profil Instansi** (`/profil-instansi`) — nama instansi.
+2. **Tambah pegawai** — input NIP + nama + jabatan (+ kontak). Detail lain dikosongkan.
+3. **Lengkapi data pegawai** — lewat menu **Payroll → Impor** (unggah file Gaji PNS; data master ikut terisi). File TPP sebagai pelengkap.
+4. **Buat formulir cuti** (`/formulir-cuti`) — pilih pegawai, tanggal, durasi; atasan & pejabat berwenang otomatis. Cetak dokumen Word.
+5. **Import payroll per bulan** — `Payroll → Impor`, pilih bulan, jenis file (Gaji utama / TPP), periksa pratinjau, konfirmasi.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Menjalankan test
+
+```bash
+php artisan test
+```
+
+## Struktur penting
+
+| Path | Isi |
+|---|---|
+| `app/Models/` | Eloquent models (Employee, LeaveRequest, PayrollPeriod, dst) |
+| `app/Http/Controllers/` | Controller per modul |
+| `app/Services/` | Logika bisnis: import, generator dokumen, durasi cuti |
+| `resources/views/` | Blade views |
+| `database/migrations/` | Skema DB |
+| `routes/web.php` | Route aplikasi |
+
+## Replikasi ke kecamatan lain
+
+Aplikasi dirancang untuk struktur **kecamatan dalam pemerintahan kota dengan Wali Kota** (alur: Camat → Sekda → Wali Kota). Untuk replikasi:
+
+1. Salin folder, jalankan instalasi di atas.
+2. Isi `.env` dengan nama instansi & kredensial baru.
+3. Migrasi + seed.
+4. Isi **Profil Instansi**.
+5. Unggah template dokumen Word sesuai instansi.
+6. Import data pegawai (menu **Impor identitas**) lalu payroll.
+
+> Catatan: alamat tujuan pada dokumen (`Yth. Wali Kota ...`) masih perlu disesuaikan per instansi di `app/Services/LeaveDocumentGenerator.php` atau template yang diunggah.
+
+## Lisensi
+
+Proyek internal pemerintahan.

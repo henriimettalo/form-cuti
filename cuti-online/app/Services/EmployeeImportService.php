@@ -29,6 +29,7 @@ class EmployeeImportService
         'Nama Lengkap',
         'Status Kepegawaian',
         'Pangkat/Golongan',
+        'Unit Kerja',
         'Jabatan',
         'TMT Mulai Kerja',
         'No. HP',
@@ -125,7 +126,7 @@ class EmployeeImportService
                 'employment_status' => $employmentStatus,
                 'rank_name' => $rank['name'] ?? null,
                 'grade' => $rank['grade'] ?? null,
-                'department_name' => $organizationName,
+                'department_name' => $this->cellValue($row, $headerMap['department_name']) ?? $organizationName,
                 'position_title' => $this->cellValue($row, $headerMap['position_title']),
                 'service_started_on' => $this->normaliseDate($this->cellValue($row, $headerMap['service_started_on'])),
                 'phone' => $this->cellValue($row, $headerMap['phone']),
@@ -177,6 +178,7 @@ class EmployeeImportService
             'Contoh Nama Pegawai',
             'PNS',
             'III/b',
+            'Kecamatan Pontianak Selatan',
             'Pengelola Layanan Operasional',
             '2020-01-01',
             '081234567890',
@@ -186,8 +188,8 @@ class EmployeeImportService
         $sheet->setCellValueExplicit('A2', '199001012020011001', DataType::TYPE_STRING);
         $sheet->setShowGridLines(false);
         $sheet->freezePane('A2');
-        $sheet->setAutoFilter('A1:I2');
-        $sheet->getStyle('A1:I1')->applyFromArray([
+        $sheet->setAutoFilter('A1:J2');
+        $sheet->getStyle('A1:J1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['argb' => 'FFFFFFFF'],
@@ -201,23 +203,24 @@ class EmployeeImportService
                 'vertical' => Alignment::VERTICAL_CENTER,
             ],
         ]);
-        $sheet->getStyle('A1:I2')->getBorders()->getBottom()
+        $sheet->getStyle('A1:J2')->getBorders()->getBottom()
             ->setBorderStyle(Border::BORDER_THIN)
             ->setColor(new Color('FFD1D5DB'));
         $sheet->getStyle('A2:A'.(self::MAX_ROWS + 1))->getNumberFormat()->setFormatCode('@');
         $sheet->getStyle('G2:G'.(self::MAX_ROWS + 1))->getNumberFormat()->setFormatCode('yyyy-mm-dd');
-        $sheet->getStyle('A2:I2')->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
+        $sheet->getStyle('A2:J2')->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
 
         foreach ([
             'A' => 24,
             'B' => 28,
             'C' => 22,
             'D' => 22,
-            'E' => 34,
-            'F' => 19,
-            'G' => 18,
-            'H' => 28,
-            'I' => 30,
+            'E' => 30,
+            'F' => 34,
+            'G' => 19,
+            'H' => 18,
+            'I' => 28,
+            'J' => 30,
         ] as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
         }
@@ -228,7 +231,7 @@ class EmployeeImportService
             ['Impor Pegawai – Petunjuk'],
             ['1. Isi data pada lembar "Data Pegawai" dan hapus baris contoh sebelum diunggah.'],
             ['2. Kolom wajib: NIP, Nama Lengkap, Status Kepegawaian, dan Jabatan.'],
-            ['3. Unit kerja diisi otomatis dari menu Profil Instansi dan tidak perlu ada di file.'],
+            ['3. Kolom Unit Kerja bersifat opsional. Jika diisi, unit tersebut dipakai; jika kosong, aplikasi memakai Profil Instansi.'],
             ['4. Pangkat/Golongan wajib untuk PNS (contoh: III/b). Untuk PPPK gunakan Golongan I sampai Golongan XX, misalnya Golongan IX.'],
             ['5. Gunakan tanggal TMT dengan format YYYY-MM-DD, misalnya 2020-01-01.'],
             ['6. NIP disimpan sebagai teks agar seluruh digit tetap utuh. Maksimal 1.000 pegawai per file.'],

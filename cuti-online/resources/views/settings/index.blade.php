@@ -68,7 +68,7 @@
                     </div>
                     <div class="sm:col-span-2">
                         <label class="form-label" for="balance_notes">Keterangan</label>
-                        <textarea class="form-textarea" id="balance_notes" name="notes"></textarea>
+                        <textarea class="form-textarea" id="balance_notes" name="notes" maxlength="1000"></textarea>
                     </div>
                     <div class="sm:col-span-2 flex justify-end">
                         <button class="btn-primary" type="submit">Simpan saldo</button>
@@ -85,15 +85,15 @@
                 @csrf
                 <div>
                     <label class="form-label" for="full_name">Nama</label>
-                    <input class="form-input" id="full_name" name="full_name" value="{{ old('full_name', $supervisor?->full_name) }}" required>
+                    <input class="form-input" id="full_name" name="full_name" value="{{ old('full_name', $supervisor?->full_name) }}" maxlength="255" required>
                 </div>
                 <div>
                     <label class="form-label" for="nip">NIP</label>
-                    <input class="form-input" id="nip" name="nip" value="{{ old('nip', $supervisor?->nip) }}">
+                    <input class="form-input" id="nip" name="nip" value="{{ old('nip', $supervisor?->nip) }}" maxlength="32">
                 </div>
                 <div class="sm:col-span-2">
                     <label class="form-label" for="position_title">Jabatan</label>
-                    <input class="form-input" id="position_title" name="position_title" value="{{ old('position_title', $supervisor?->position_title) }}" required>
+                    <input class="form-input" id="position_title" name="position_title" value="{{ old('position_title', $supervisor?->position_title) }}" maxlength="255" required>
                 </div>
                 <div class="sm:col-span-2 flex justify-end">
                     <button class="btn-primary" type="submit">Simpan atasan</button>

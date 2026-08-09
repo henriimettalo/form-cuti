@@ -101,7 +101,7 @@ class LeaveRequestController extends Controller
                 ->withErrors(['authorized_official' => 'Isi data Wali Kota terlebih dahulu.']);
         }
 
-        if (!$isCamat && $authorizedOfficial === null) {
+        if (! $isCamat && $authorizedOfficial === null) {
             return back()
                 ->withInput()
                 ->withErrors(['authorized_official' => 'Isi data pejabat berwenang terlebih dahulu.']);
@@ -113,11 +113,15 @@ class LeaveRequestController extends Controller
             ->first();
 
         $employee = Employee::query()
-            ->with(['department', 'position'])
+            ->with([
+                'department',
+                'position',
+                'positionHistories' => fn ($query) => $query->latest('effective_on')->latest('id'),
+            ])
             ->findOrFail($data['employee_id']);
         $plhEmployee = null;
 
-        if (!empty($data['plh_employee_id'])) {
+        if (! empty($data['plh_employee_id'])) {
             $plhEmployee = Employee::query()
                 ->with('position')
                 ->where('is_active', true)
@@ -340,7 +344,9 @@ class LeaveRequestController extends Controller
                 $employee->rank_name,
                 $employee->grade,
             ),
-            'department' => $employee->department?->name ?? '-',
+            'department' => $employee->positionHistories->firstWhere('department_name')?->department_name
+                ?? $employee->department?->name
+                ?? '-',
             'service_period' => $servicePeriod,
             'phone' => $employee->phone ?? '-',
         ];

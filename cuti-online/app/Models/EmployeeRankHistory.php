@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EmployeeRankHistory extends Model
 {
@@ -35,5 +36,10 @@ class EmployeeRankHistory extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function salaryHistories(): HasMany
+    {
+        return $this->hasMany(EmployeeSalaryHistory::class);
     }
 }

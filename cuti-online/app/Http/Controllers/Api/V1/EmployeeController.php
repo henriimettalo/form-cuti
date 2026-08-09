@@ -24,8 +24,18 @@ class EmployeeController extends Controller
             'updated_since' => ['nullable', 'date'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:'.config('api.pagination.max')],
         ]);
+        $relations = [
+            'department',
+            'position',
+            'positionHistories' => fn ($query) => $query->latest('effective_on')->latest('id'),
+        ];
+
+        if ($request->user()?->tokenCan('employees:profile')) {
+            $relations[] = 'bankAccounts';
+        }
+
         $employees = Employee::query()
-            ->with(['department', 'position'])
+            ->with($relations)
             ->when($data['search'] ?? null, function ($query, string $search): void {
                 $query->where(function ($nestedQuery) use ($search): void {
                     $nestedQuery
@@ -45,7 +55,17 @@ class EmployeeController extends Controller
 
     public function show(Employee $employee): EmployeeResource
     {
-        return new EmployeeResource($employee->load(['department', 'position']));
+        $relations = [
+            'department',
+            'position',
+            'positionHistories' => fn ($query) => $query->latest('effective_on')->latest('id'),
+        ];
+
+        if (request()->user()?->tokenCan('employees:profile')) {
+            $relations[] = 'bankAccounts';
+        }
+
+        return new EmployeeResource($employee->load($relations));
     }
 
     public function store(StoreEmployeeRequest $request, EmployeeOnboardingService $onboarding): JsonResponse
@@ -65,7 +85,13 @@ class EmployeeController extends Controller
             ], Response::HTTP_CONFLICT);
         }
 
-        return (new EmployeeResource($employee->load(['department', 'position'])))
+        $relations = ['department', 'position'];
+
+        if ($request->user()?->tokenCan('employees:profile')) {
+            $relations[] = 'bankAccounts';
+        }
+
+        return (new EmployeeResource($employee->load($relations)))
             ->response()
             ->setStatusCode(Response::HTTP_CREATED)
             ->header('Location', route('api.v1.employees.show', ['employee' => $employee->nip]));
