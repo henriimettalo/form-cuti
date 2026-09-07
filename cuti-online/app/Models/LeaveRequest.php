@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\LeaveRequestFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -88,5 +89,21 @@ class LeaveRequest extends Model
     public function generatedDocuments(): HasMany
     {
         return $this->hasMany(GeneratedDocument::class);
+    }
+
+    /**
+     * @param  Builder<LeaveRequest>  $query
+     * @return Builder<LeaveRequest>
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->isSuperAdmin()) {
+            return $query;
+        }
+
+        return $query->whereHas(
+            'employee',
+            fn (Builder $employeeQuery) => $employeeQuery->where('department_id', $user->department_id),
+        );
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\EmployeeFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -105,6 +106,19 @@ class Employee extends Model
     public function payrollRecords(): HasMany
     {
         return $this->hasMany(EmployeePayroll::class);
+    }
+
+    /**
+     * @param  Builder<Employee>  $query
+     * @return Builder<Employee>
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->isSuperAdmin()) {
+            return $query;
+        }
+
+        return $query->where('department_id', $user->department_id);
     }
 
     public function positionHistories(): HasMany

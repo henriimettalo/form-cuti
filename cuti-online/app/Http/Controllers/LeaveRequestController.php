@@ -10,6 +10,7 @@ use App\Models\LeaveBalanceSnapshot;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\Official;
+use App\Models\User;
 use App\Services\LeaveDocumentGenerator;
 use App\Services\LeaveDurationCalculator;
 use App\Support\EmployeeRankOptions;
@@ -26,19 +27,26 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class LeaveRequestController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        /** @var User $user */
+        $user = $request->user();
+
         return view('leave-requests.index', [
             'leaveRequests' => LeaveRequest::query()
+                ->visibleTo($user)
                 ->with(['employee', 'leaveType', 'generatedDocuments'])
                 ->latest('created_at')
                 ->paginate(12),
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        /** @var User $user */
+        $user = $request->user();
         $employees = Employee::query()
+            ->visibleTo($user)
             ->with(['department', 'position'])
             ->where('is_active', true)
             ->orderBy('full_name')
@@ -64,6 +72,8 @@ class LeaveRequestController extends Controller
         LeaveDurationCalculator $durationCalculator,
         LeaveDocumentGenerator $documentGenerator,
     ): RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
         $data = $request->validate([
             'idempotency_key' => ['required', 'uuid'],
             'employee_id' => ['required', 'integer', Rule::exists('employees', 'id')],
@@ -84,7 +94,7 @@ class LeaveRequestController extends Controller
             ],
         ]);
 
-        $existingLeaveRequest = $this->findByIdempotencyKey($data['idempotency_key']);
+        $existingLeaveRequest = $this->findByIdempotencyKey($data['idempotency_key'], $user);
 
         if ($existingLeaveRequest !== null) {
             return $this->existingRequestResponse($existingLeaveRequest);
@@ -113,6 +123,7 @@ class LeaveRequestController extends Controller
             ->first();
 
         $employee = Employee::query()
+            ->visibleTo($user)
             ->with([
                 'department',
                 'position',
@@ -123,6 +134,7 @@ class LeaveRequestController extends Controller
 
         if (! empty($data['plh_employee_id'])) {
             $plhEmployee = Employee::query()
+                ->visibleTo($user)
                 ->with('position')
                 ->where('is_active', true)
                 ->find($data['plh_employee_id']);
@@ -145,6 +157,7 @@ class LeaveRequestController extends Controller
             $supervisor = $sekdaOfficial;
         } else {
             $supervisor = Employee::query()
+                ->visibleTo($user)
                 ->with('position')
                 ->where('is_active', true)
                 ->find($data['supervisor_employee_id']);
@@ -274,7 +287,7 @@ class LeaveRequestController extends Controller
                 return $leaveRequest;
             });
         } catch (QueryException $exception) {
-            $existingLeaveRequest = $this->findByIdempotencyKey($data['idempotency_key']);
+            $existingLeaveRequest = $this->findByIdempotencyKey($data['idempotency_key'], $user);
 
             if ($existingLeaveRequest !== null) {
                 return $this->existingRequestResponse($existingLeaveRequest);
@@ -300,8 +313,12 @@ class LeaveRequestController extends Controller
             ->with('status', 'Formulir berhasil dibuat dan dokumen Word siap diunduh.');
     }
 
-    public function show(LeaveRequest $leaveRequest): View
+    public function show(Request $request, LeaveRequest $leaveRequest): View
     {
+        /** @var User $user */
+        $user = $request->user();
+        $this->ensureLeaveRequestIsVisibleTo($leaveRequest, $user);
+
         $leaveRequest->load([
             'employee.department',
             'employee.position',
@@ -313,8 +330,14 @@ class LeaveRequestController extends Controller
         return view('leave-requests.show', compact('leaveRequest'));
     }
 
-    public function download(GeneratedDocument $generatedDocument): StreamedResponse
+    public function download(Request $request, GeneratedDocument $generatedDocument): StreamedResponse
     {
+        /** @var User $user */
+        $user = $request->user();
+        $leaveRequest = $generatedDocument->leaveRequest;
+
+        abort_unless($leaveRequest instanceof LeaveRequest, 404);
+        $this->ensureLeaveRequestIsVisibleTo($leaveRequest, $user);
         abort_unless(Storage::disk('local')->exists($generatedDocument->storage_path), 404);
 
         return Storage::disk('local')->download(
@@ -408,11 +431,23 @@ class LeaveRequestController extends Controller
         return $this->officialData($authorizedOfficial);
     }
 
-    private function findByIdempotencyKey(string $idempotencyKey): ?LeaveRequest
+    private function findByIdempotencyKey(string $idempotencyKey, User $user): ?LeaveRequest
     {
         return LeaveRequest::query()
+            ->visibleTo($user)
             ->where('idempotency_key', $idempotencyKey)
             ->first();
+    }
+
+    private function ensureLeaveRequestIsVisibleTo(LeaveRequest $leaveRequest, User $user): void
+    {
+        abort_unless(
+            LeaveRequest::query()
+                ->visibleTo($user)
+                ->whereKey($leaveRequest->getKey())
+                ->exists(),
+            404,
+        );
     }
 
     private function existingRequestResponse(LeaveRequest $leaveRequest): RedirectResponse

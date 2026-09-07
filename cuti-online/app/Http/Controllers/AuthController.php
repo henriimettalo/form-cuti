@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -25,6 +26,21 @@ class AuthController extends Controller
             return back()
                 ->withInput($request->only('email', 'remember'))
                 ->withErrors(['email' => 'Email atau kata sandi tidak sesuai.']);
+        }
+
+        /** @var User|null $user */
+        $user = Auth::user();
+        $isLegacyOperator = $user instanceof User
+            && strtolower(trim((string) $user->role)) === 'operator';
+
+        if ($user instanceof User && ! $user->isSuperAdmin() && ! $isLegacyOperator && ! $user->department?->is_active) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return to_route('login')
+                ->withInput($request->only('email', 'remember'))
+                ->withErrors(['email' => 'Akun diblokir karena unit kerja Anda sedang nonaktif.']);
         }
 
         $request->session()->regenerate();

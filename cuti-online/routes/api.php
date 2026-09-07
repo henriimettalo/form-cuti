@@ -5,7 +5,7 @@ use App\Http\Controllers\Api\V1\LeaveRequestController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')
-    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->middleware(['auth:sanctum', 'role:super_admin', 'throttle:60,1'])
     ->group(function (): void {
         Route::get('/employees', [EmployeeController::class, 'index'])
             ->middleware('abilities:employees:read')

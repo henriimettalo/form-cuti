@@ -215,7 +215,7 @@ if (workspaceRoot && !isWorkspaceFrame) {
             frame.className = 'workspace-frame';
             frame.src = url;
             frame.title = `${title} — ruang kerja`;
-            frame.setAttribute('scrolling', 'no');
+            frame.setAttribute('scrolling', 'auto');
             frame.dataset.workspaceFrame = '';
             panel.append(frame);
             workspacePanels.append(panel);
@@ -343,7 +343,10 @@ if (workspaceRoot && !isWorkspaceFrame) {
                 return;
             }
 
-            frame.style.height = `${Math.max(608, Math.ceil(height))}px`;
+            const viewportHeight = window.innerHeight;
+            const cappedHeight = Math.max(608, Math.min(viewportHeight, Math.ceil(height)));
+
+            frame.style.height = `${cappedHeight}px`;
         });
     }
 }
@@ -1976,6 +1979,450 @@ document.querySelectorAll(floatingFieldControlSelector).forEach((control) => {
 window.addEventListener('pageshow', () => {
     floatingFieldSynchronizers.forEach((syncFloatingField) => syncFloatingField());
 });
+
+document.querySelectorAll('[data-unit-admin-form]').forEach((form) => {
+    const sourceControls = Array.from(form.querySelectorAll('input[name="department_source"]'));
+    const sourceOptions = Array.from(form.querySelectorAll('[data-unit-source-option]'));
+    const existingSection = form.querySelector('[data-existing-unit-section]');
+    const newSection = form.querySelector('[data-new-unit-section]');
+    const existingControl = form.querySelector('[data-existing-unit-control]');
+    const newControls = Array.from(form.querySelectorAll('[data-new-unit-control]'));
+    const departmentTypeControl = form.querySelector('[data-department-type-control]');
+    const departmentCodeControl = form.querySelector('[data-department-code-control]');
+
+    const departmentCodePrefix = () => departmentTypeControl?.value === 'kelurahan'
+        ? 'KEL'
+        : departmentTypeControl?.value === 'kecamatan'
+            ? 'KEC'
+            : '';
+
+    const syncDepartmentCode = () => {
+        if (!departmentTypeControl || !departmentCodeControl || departmentCodeControl.disabled) {
+            return;
+        }
+
+        const prefix = departmentCodePrefix();
+
+        if (!prefix) {
+            return;
+        }
+
+        const rawValue = departmentCodeControl.value.trim();
+
+        if (rawValue === '') {
+            departmentCodeControl.value = '';
+            return;
+        }
+
+        const suffix = rawValue
+            .toUpperCase()
+            .replace(/^(?:KEC|KEL)(?:[-_\s]*)/, '')
+            .replace(/[^A-Z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+
+        departmentCodeControl.value = suffix ? `${prefix}-${suffix}` : `${prefix}-`;
+    };
+
+    const syncDepartmentSource = () => {
+        const useExistingDepartment = sourceControls.find((control) => control.checked)?.value === 'existing';
+
+        existingSection.hidden = !useExistingDepartment;
+        newSection.hidden = useExistingDepartment;
+        existingControl.disabled = !useExistingDepartment;
+        existingControl.required = useExistingDepartment;
+
+        newControls.forEach((control) => {
+            control.disabled = useExistingDepartment;
+            control.required = !useExistingDepartment && (
+                ['department_type', 'department_name'].includes(control.id)
+                || (control.id === 'department_parent_id' && departmentTypeControl?.value === 'kelurahan')
+            );
+        });
+        sourceOptions.forEach((option) => {
+            option.classList.toggle('is-selected', option.querySelector('input')?.checked ?? false);
+        });
+    };
+
+    sourceControls.forEach((control) => control.addEventListener('change', syncDepartmentSource));
+    departmentTypeControl?.addEventListener('change', () => {
+        syncDepartmentCode();
+        syncDepartmentSource();
+    });
+    departmentCodeControl?.addEventListener('input', syncDepartmentCode);
+    syncDepartmentSource();
+    syncDepartmentCode();
+});
+
+const accountTabs = document.querySelector('[data-account-tabs]');
+
+if (accountTabs) {
+    const accountTabButtons = Array.from(accountTabs.querySelectorAll('[data-account-tab]'));
+    const accountTabPanels = Array.from(document.querySelectorAll('[data-account-tab-panel]'));
+
+    const activateAccountTab = (tabId, shouldFocus = false) => {
+        const activeButton = accountTabButtons.find((button) => button.dataset.accountTab === tabId);
+
+        if (!activeButton) {
+            return;
+        }
+
+        accountTabButtons.forEach((button) => {
+            const isActive = button === activeButton;
+
+            button.classList.toggle('account-tab-active', isActive);
+            button.setAttribute('aria-selected', String(isActive));
+            button.setAttribute('tabindex', isActive ? '0' : '-1');
+        });
+
+        accountTabPanels.forEach((panel) => {
+            panel.hidden = panel.dataset.accountTabPanel !== tabId;
+        });
+
+        if (shouldFocus) {
+            activeButton.focus();
+        }
+    };
+
+    accountTabButtons.forEach((button) => {
+        button.addEventListener('click', () => activateAccountTab(button.dataset.accountTab));
+    });
+
+    accountTabs.addEventListener('keydown', (event) => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+            return;
+        }
+
+        const currentIndex = accountTabButtons.indexOf(document.activeElement);
+
+        if (currentIndex === -1) {
+            return;
+        }
+
+        let nextIndex = currentIndex;
+
+        if (event.key === 'ArrowLeft') {
+            nextIndex = currentIndex === 0 ? accountTabButtons.length - 1 : currentIndex - 1;
+        }
+
+        if (event.key === 'ArrowRight') {
+            nextIndex = currentIndex === accountTabButtons.length - 1 ? 0 : currentIndex + 1;
+        }
+
+        if (event.key === 'Home') {
+            nextIndex = 0;
+        }
+
+        if (event.key === 'End') {
+            nextIndex = accountTabButtons.length - 1;
+        }
+
+        event.preventDefault();
+        activateAccountTab(accountTabButtons[nextIndex].dataset.accountTab, true);
+    });
+
+    activateAccountTab(accountTabs.dataset.accountTabDefault ?? accountTabButtons[0]?.dataset.accountTab);
+}
+
+const departmentEditorOverlay = document.querySelector('[data-department-editor-overlay]');
+
+if (departmentEditorOverlay) {
+    const departmentEditorDialog = departmentEditorOverlay.querySelector('[data-department-editor-dialog]');
+    const departmentEditorForm = departmentEditorOverlay.querySelector('[data-department-editor-form]');
+    const departmentEditorType = departmentEditorForm.querySelector('[data-department-editor-type]');
+    const departmentEditorParent = departmentEditorForm.querySelector('[data-department-editor-parent]');
+    const departmentEditorCode = departmentEditorForm.querySelector('[data-department-editor-code]');
+    const departmentEditorName = departmentEditorForm.querySelector('#department_editor_name');
+    const departmentEditorSimpegCode = departmentEditorForm.querySelector('#department_editor_simpeg_code');
+    const departmentEditorPhone = departmentEditorForm.querySelector('#department_editor_phone');
+    const departmentEditorAddress = departmentEditorForm.querySelector('#department_editor_address');
+    const departmentEditorContext = departmentEditorForm.querySelector('[data-department-editor-context-input]');
+    const departmentEditorId = departmentEditorForm.querySelector('[data-department-editor-id-input]');
+    const departmentEditorMethod = departmentEditorForm.querySelector('[data-department-editor-method]');
+    const departmentEditorTitle = departmentEditorOverlay.querySelector('[data-department-editor-title]');
+    const departmentEditorDescription = departmentEditorOverlay.querySelector('[data-department-editor-description]');
+    const departmentEditorSubmit = departmentEditorOverlay.querySelector('[data-department-editor-submit]');
+    const departmentEditorCloseButton = departmentEditorOverlay.querySelector('[data-department-editor-close]');
+    const departmentEditorCancel = departmentEditorOverlay.querySelector('[data-department-editor-cancel]');
+    const parentOptions = Array.from(departmentEditorParent.options);
+    let departmentEditorPreviouslyFocused = null;
+    let closeDepartmentEditorTimeout = null;
+
+    const normalizeEditorCode = () => {
+        const prefix = departmentEditorType.value === 'kelurahan'
+            ? 'KEL'
+            : departmentEditorType.value === 'kecamatan'
+                ? 'KEC'
+                : '';
+
+        if (!prefix) {
+            return;
+        }
+
+        const suffix = departmentEditorCode.value
+            .trim()
+            .toUpperCase()
+            .replace(/^(?:KEC|KEL)(?:[-_\s]*)/, '')
+            .replace(/[^A-Z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+
+        departmentEditorCode.value = suffix ? `${prefix}-${suffix}` : '';
+    };
+
+    const syncEditorParent = () => {
+        const isKelurahan = departmentEditorType.value === 'kelurahan';
+
+        departmentEditorParent.disabled = !isKelurahan;
+        departmentEditorParent.required = isKelurahan;
+
+        if (!isKelurahan) {
+            departmentEditorParent.value = '';
+        }
+    };
+
+    const syncEditorFields = () => {
+        normalizeEditorCode();
+        syncEditorParent();
+    };
+
+    const hideCurrentParentOption = (departmentId) => {
+        parentOptions.forEach((option) => {
+            const isCurrentDepartment = departmentId !== '' && option.value === String(departmentId);
+
+            option.hidden = isCurrentDepartment;
+            option.disabled = isCurrentDepartment;
+        });
+    };
+
+    const showDepartmentEditor = () => {
+        departmentEditorOverlay.classList.remove('hidden', 'opacity-0');
+        departmentEditorOverlay.classList.add('flex');
+        departmentEditorOverlay.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+
+        window.requestAnimationFrame(() => {
+            departmentEditorOverlay.classList.add('opacity-100');
+            departmentEditorDialog.classList.remove('translate-y-2', 'opacity-0');
+            departmentEditorDialog.classList.add('translate-y-0', 'opacity-100');
+        });
+    };
+
+    const closeDepartmentEditor = () => {
+        departmentEditorOverlay.classList.remove('opacity-100');
+        departmentEditorOverlay.classList.add('opacity-0');
+        departmentEditorDialog.classList.remove('translate-y-0', 'opacity-100');
+        departmentEditorDialog.classList.add('translate-y-2', 'opacity-0');
+        window.clearTimeout(closeDepartmentEditorTimeout);
+        closeDepartmentEditorTimeout = window.setTimeout(() => {
+            departmentEditorOverlay.classList.add('hidden');
+            departmentEditorOverlay.classList.remove('flex');
+            departmentEditorOverlay.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+            departmentEditorPreviouslyFocused?.focus();
+            departmentEditorPreviouslyFocused = null;
+        }, 160);
+    };
+
+    const setCreateMode = (preserveValues = false) => {
+        departmentEditorForm.action = departmentEditorOverlay.dataset.departmentEditorStoreAction;
+        departmentEditorMethod.removeAttribute('name');
+        departmentEditorMethod.value = '';
+        departmentEditorId.removeAttribute('name');
+        departmentEditorId.value = '';
+        departmentEditorContext.value = 'department';
+        departmentEditorTitle.textContent = 'Tambah unit kerja';
+        departmentEditorDescription.textContent = 'Unit dapat disimpan tanpa membuat akun Admin Unit.';
+        departmentEditorSubmit.textContent = 'Simpan unit';
+        hideCurrentParentOption('');
+
+        if (!preserveValues) {
+            departmentEditorForm.reset();
+            departmentEditorType.value = '';
+            departmentEditorCode.value = '';
+            departmentEditorSimpegCode.value = '';
+            departmentEditorParent.value = '';
+            departmentEditorName.value = '';
+            departmentEditorPhone.value = '';
+            departmentEditorAddress.value = '';
+        }
+
+        syncEditorFields();
+    };
+
+    const setEditMode = (button = null, preserveValues = false) => {
+        const departmentId = button?.dataset.departmentId ?? departmentEditorOverlay.dataset.departmentEditorOldId ?? '';
+        const action = button?.dataset.departmentAction
+            ?? departmentEditorOverlay.dataset.departmentEditorUpdateTemplate?.replace('__DEPARTMENT__', departmentId);
+
+        departmentEditorForm.action = action;
+        departmentEditorMethod.setAttribute('name', '_method');
+        departmentEditorMethod.value = 'PUT';
+        departmentEditorId.setAttribute('name', 'department_id');
+        departmentEditorId.value = departmentId;
+        departmentEditorContext.value = 'department-edit';
+        departmentEditorTitle.textContent = 'Edit unit kerja';
+        departmentEditorDescription.textContent = 'Perbarui metadata unit tanpa mengubah akun, pegawai, atau riwayat yang sudah tersimpan.';
+        departmentEditorSubmit.textContent = 'Simpan perubahan';
+        hideCurrentParentOption(departmentId);
+
+        if (!preserveValues && button) {
+            departmentEditorType.value = button.dataset.departmentType ?? '';
+            departmentEditorCode.value = button.dataset.departmentCode ?? '';
+            departmentEditorSimpegCode.value = button.dataset.departmentSimpegCode ?? '';
+            departmentEditorParent.value = button.dataset.departmentParentId ?? '';
+            departmentEditorName.value = button.dataset.departmentName ?? '';
+            departmentEditorPhone.value = button.dataset.departmentPhone ?? '';
+            departmentEditorAddress.value = button.dataset.departmentAddress ?? '';
+        }
+
+        syncEditorFields();
+    };
+
+    const openDepartmentEditor = (mode, button = null, preserveValues = false) => {
+        window.clearTimeout(closeDepartmentEditorTimeout);
+        departmentEditorPreviouslyFocused = document.activeElement;
+
+        if (mode === 'edit') {
+            setEditMode(button, preserveValues);
+        } else {
+            setCreateMode(preserveValues);
+        }
+
+        showDepartmentEditor();
+        window.setTimeout(() => departmentEditorType.focus(), 0);
+    };
+
+    document.querySelectorAll('[data-department-create-open]').forEach((button) => {
+        button.addEventListener('click', () => openDepartmentEditor('create', button));
+    });
+
+    document.querySelectorAll('[data-department-edit-open]').forEach((button) => {
+        button.addEventListener('click', () => openDepartmentEditor('edit', button));
+    });
+
+    departmentEditorType.addEventListener('change', syncEditorFields);
+    departmentEditorCode.addEventListener('input', normalizeEditorCode);
+    departmentEditorCancel.addEventListener('click', closeDepartmentEditor);
+    departmentEditorCloseButton.addEventListener('click', closeDepartmentEditor);
+    departmentEditorOverlay.addEventListener('click', (event) => {
+        if (event.target === departmentEditorOverlay) {
+            closeDepartmentEditor();
+        }
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !departmentEditorOverlay.classList.contains('hidden')) {
+            event.preventDefault();
+            closeDepartmentEditor();
+        }
+    });
+
+    if (departmentEditorOverlay.dataset.departmentEditorOpen === 'true') {
+        const mode = departmentEditorOverlay.dataset.departmentEditorContext === 'department-edit'
+            ? 'edit'
+            : 'create';
+
+        openDepartmentEditor(mode, null, true);
+    }
+}
+
+const departmentConfirmOverlay = document.querySelector('[data-department-confirm-overlay]');
+
+if (departmentConfirmOverlay) {
+    const departmentConfirmDialog = departmentConfirmOverlay.querySelector('[data-department-confirm-dialog]');
+    const departmentConfirmTitle = departmentConfirmOverlay.querySelector('[data-department-confirm-title]');
+    const departmentConfirmMessage = departmentConfirmOverlay.querySelector('[data-department-confirm-message]');
+    const departmentConfirmIcon = departmentConfirmOverlay.querySelector('[data-department-confirm-icon]');
+    const departmentConfirmNote = departmentConfirmOverlay.querySelector('[data-department-confirm-note]');
+    const departmentConfirmSubmit = departmentConfirmOverlay.querySelector('[data-department-confirm-submit]');
+    const departmentConfirmCancel = departmentConfirmOverlay.querySelector('[data-department-confirm-cancel]');
+    let pendingDepartmentForm = null;
+    let previouslyFocusedElement = null;
+    let closeDepartmentConfirmTimeout = null;
+
+    const setDepartmentConfirmState = (isDeactivation) => {
+        departmentConfirmTitle.textContent = isDeactivation ? 'Nonaktifkan unit kerja?' : 'Aktifkan kembali unit kerja?';
+        departmentConfirmSubmit.textContent = isDeactivation ? 'Nonaktifkan' : 'Aktifkan kembali';
+        departmentConfirmSubmit.classList.toggle('btn-warning', isDeactivation);
+        departmentConfirmSubmit.classList.toggle('btn-success', !isDeactivation);
+        departmentConfirmIcon.classList.toggle('bg-amber-100', isDeactivation);
+        departmentConfirmIcon.classList.toggle('text-amber-700', isDeactivation);
+        departmentConfirmIcon.classList.toggle('bg-emerald-100', !isDeactivation);
+        departmentConfirmIcon.classList.toggle('text-emerald-700', !isDeactivation);
+        departmentConfirmNote.classList.toggle('bg-amber-50', isDeactivation);
+        departmentConfirmNote.classList.toggle('text-amber-900', isDeactivation);
+        departmentConfirmNote.classList.toggle('bg-emerald-50', !isDeactivation);
+        departmentConfirmNote.classList.toggle('text-emerald-900', !isDeactivation);
+    };
+
+    const closeDepartmentConfirm = () => {
+        pendingDepartmentForm = null;
+        departmentConfirmOverlay.classList.remove('opacity-100');
+        departmentConfirmOverlay.classList.add('opacity-0');
+        departmentConfirmDialog.classList.remove('translate-y-0', 'opacity-100');
+        departmentConfirmDialog.classList.add('translate-y-2', 'opacity-0');
+        window.clearTimeout(closeDepartmentConfirmTimeout);
+        closeDepartmentConfirmTimeout = window.setTimeout(() => {
+            departmentConfirmOverlay.classList.add('hidden');
+            departmentConfirmOverlay.classList.remove('flex');
+            departmentConfirmOverlay.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+            previouslyFocusedElement?.focus();
+            previouslyFocusedElement = null;
+        }, 160);
+    };
+
+    const openDepartmentConfirm = (form) => {
+        const isDeactivation = form.dataset.departmentStatus === 'deactivate';
+        const departmentName = form.dataset.departmentName ?? 'unit kerja ini';
+
+        window.clearTimeout(closeDepartmentConfirmTimeout);
+        pendingDepartmentForm = form;
+        previouslyFocusedElement = document.activeElement;
+        setDepartmentConfirmState(isDeactivation);
+        departmentConfirmMessage.textContent = `${isDeactivation ? 'Nonaktifkan' : 'Aktifkan kembali'} unit kerja ${departmentName}? Data dan riwayat tetap tersimpan.`;
+        departmentConfirmOverlay.classList.remove('hidden', 'opacity-0');
+        departmentConfirmOverlay.classList.add('flex');
+        departmentConfirmOverlay.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+
+        window.requestAnimationFrame(() => {
+            departmentConfirmOverlay.classList.add('opacity-100');
+            departmentConfirmDialog.classList.remove('translate-y-2', 'opacity-0');
+            departmentConfirmDialog.classList.add('translate-y-0', 'opacity-100');
+        });
+
+        departmentConfirmCancel.focus();
+    };
+
+    document.querySelectorAll('[data-department-confirm-form]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            openDepartmentConfirm(form);
+        });
+    });
+
+    departmentConfirmCancel.addEventListener('click', closeDepartmentConfirm);
+    departmentConfirmOverlay.addEventListener('click', (event) => {
+        if (event.target === departmentConfirmOverlay) {
+            closeDepartmentConfirm();
+        }
+    });
+    departmentConfirmSubmit.addEventListener('click', () => {
+        if (!pendingDepartmentForm) {
+            return;
+        }
+
+        const form = pendingDepartmentForm;
+
+        closeDepartmentConfirm();
+        HTMLFormElement.prototype.submit.call(form);
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !departmentConfirmOverlay.classList.contains('hidden')) {
+            event.preventDefault();
+            closeDepartmentConfirm();
+        }
+    });
+}
 
 document.querySelectorAll('[data-import-managed]').forEach((section) => {
     const note = document.createElement('p');

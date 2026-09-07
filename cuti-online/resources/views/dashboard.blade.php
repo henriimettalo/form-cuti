@@ -3,18 +3,26 @@
 @section('title', 'Dashboard')
 
 @section('content')
+    @php
+        $dashboardUser = auth()->user();
+        $canManageMasterData = $dashboardUser->isSuperAdmin()
+            || strtolower(trim((string) $dashboardUser->role)) === 'operator';
+    @endphp
+
     <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Sistem kepegawaian</p>
-            <h1 class="page-title mt-2">Kelola data dan riwayat pegawai dalam satu tempat.</h1>
-            <p class="page-description">Profil pegawai menjadi sumber data utama; formulir cuti menggunakan data tersebut lalu menyimpannya sebagai arsip dokumen.</p>
+            <h1 class="page-title mt-2">{{ $canManageMasterData ? 'Kelola data dan riwayat pegawai dalam satu tempat.' : 'Buat dan pantau formulir cuti unit kerja Anda.' }}</h1>
+            <p class="page-description">{{ $canManageMasterData ? 'Profil pegawai menjadi sumber data utama; formulir cuti menggunakan data tersebut lalu menyimpannya sebagai arsip dokumen.' : 'Formulir cuti hanya menampilkan pegawai dan dokumen pada unit kerja Anda.' }}</p>
         </div>
         <div class="flex flex-wrap gap-3">
             <a class="btn-secondary shrink-0" href="{{ route('leave-requests.create') }}" data-workspace-link data-workspace-title="Buat Formulir">Buat formulir cuti</a>
-            <a class="btn-primary shrink-0" href="{{ route('employees.create') }}">
-                <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                Tambah pegawai
-            </a>
+            @if ($canManageMasterData)
+                <a class="btn-primary shrink-0" href="{{ route('employees.create') }}">
+                    <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                    Tambah pegawai
+                </a>
+            @endif
         </div>
     </div>
 
@@ -22,12 +30,20 @@
         <div class="card">
             <p class="text-sm font-medium text-slate-500">Pegawai aktif</p>
             <p class="mt-2 text-3xl font-semibold tracking-tight tabular-nums text-slate-950">{{ $employeeCount }}</p>
-            <a class="mt-4 inline-flex text-sm font-semibold text-sky-700 hover:text-sky-800" href="{{ route('employees.index') }}">Kelola pegawai →</a>
+            @if ($canManageMasterData)
+                <a class="mt-4 inline-flex text-sm font-semibold text-sky-700 hover:text-sky-800" href="{{ route('employees.index') }}">Kelola pegawai →</a>
+            @else
+                <p class="mt-4 text-sm text-slate-500">Sesuai unit kerja Anda.</p>
+            @endif
         </div>
         <div class="card">
             <p class="text-sm font-medium text-slate-500">Perubahan karier bulan ini</p>
             <p class="mt-2 text-3xl font-semibold tracking-tight tabular-nums text-slate-950">{{ $careerChangeCount }}</p>
-            <a class="mt-4 inline-flex text-sm font-semibold text-sky-700 hover:text-sky-800" href="{{ route('employees.index') }}">Buka profil pegawai →</a>
+            @if ($canManageMasterData)
+                <a class="mt-4 inline-flex text-sm font-semibold text-sky-700 hover:text-sky-800" href="{{ route('employees.index') }}">Buka profil pegawai →</a>
+            @else
+                <p class="mt-4 text-sm text-slate-500">Ringkasan aktivitas bulan ini.</p>
+            @endif
         </div>
         <div class="card">
             <p class="text-sm font-medium text-slate-500">Formulir tersimpan</p>
@@ -53,7 +69,7 @@
         @if ($recentRequests->isEmpty())
             <div class="card-inner mt-5 text-center">
                 <p class="text-sm font-medium text-slate-700">Belum ada formulir cuti.</p>
-                <p class="mt-1 text-sm text-slate-500">Tambahkan profil pegawai lalu buat formulir cuti pertama.</p>
+                <p class="mt-1 text-sm text-slate-500">Buat formulir cuti pertama untuk pegawai di unit kerja Anda.</p>
             </div>
         @else
             <div class="mt-5 overflow-x-auto">

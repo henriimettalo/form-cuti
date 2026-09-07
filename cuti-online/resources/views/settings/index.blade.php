@@ -136,4 +136,147 @@
             </div>
         </div>
     </section>
+
+    @if ($canViewSensitive ?? false)
+        <section class="card mt-6">
+            <h2 class="section-heading">Daftar backup</h2>
+            <p class="section-description">Salinan database yang dibuat otomatis sebelum setiap reset data. Unduh untuk penyimpanan manual.</p>
+
+            @if (empty($backups))
+                <div class="card-inner mt-5 text-sm text-slate-600">Belum ada backup. Backup dibuat otomatis saat reset data dijalankan.</div>
+            @else
+                <div class="mt-5 overflow-x-auto">
+                    <table class="min-w-full text-left text-sm">
+                        <thead class="text-xs uppercase tracking-[0.08em] text-slate-400">
+                            <tr>
+                                <th class="pb-2 pr-5 font-semibold">Nama file</th>
+                                <th class="pb-2 pr-5 font-semibold">Ukuran</th>
+                                <th class="pb-2 pr-5 font-semibold">Dibuat</th>
+                                <th class="pb-2 text-right font-semibold">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach ($backups as $backup)
+                                <tr class="transition-colors duration-150 hover:bg-slate-50">
+                                    <td class="py-3 pr-5 font-mono text-xs text-slate-600">{{ $backup['name'] }}</td>
+                                    <td class="py-3 pr-5 tabular-nums text-slate-600">{{ $backup['size_human'] }}</td>
+                                    <td class="py-3 pr-5 tabular-nums text-slate-600">{{ $backup['modified_at'] }}</td>
+                                    <td class="py-3 text-right">
+                                        <a class="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-white px-2.5 text-xs font-semibold text-sky-700 shadow-[inset_0_0_0_1px_rgba(14,165,233,0.3)] transition-colors duration-150 hover:bg-sky-50" href="{{ route('settings.backups.download', ['file' => $backup['name']]) }}">
+                                            <svg aria-hidden="true" class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                                            Unduh
+                                        </a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </section>
+
+        <section class="card mt-6 border-rose-200">
+            <h2 class="section-heading">Reset data transaksional</h2>
+            <p class="section-description">Hapus semua data pegawai (termasuk arsip), cuti, payroll, riwayat, dan log. Konfigurasi (profil instansi, pejabat, jenis cuti, template dokumen, akun) dipertahankan.</p>
+
+            <div class="card-inner mt-5 rounded-xl bg-rose-50 text-sm leading-6 text-rose-800 shadow-[inset_0_0_0_1px_rgba(225,29,72,0.14)]">
+                <p class="font-semibold">Peringatan — tidak dapat dibatalkan.</p>
+                <ul class="mt-1 list-inside list-disc">
+                    <li>Salinan database dibuat otomatis ke <code class="font-mono text-xs">storage/app/backups/</code> sebelum penghapusan.</li>
+                    <li>Data pegawai, cuti, payroll, riwayat, dan log <strong>dihapus permanen</strong>.</li>
+                    <li>Anda tetap masuk, dan dapat mengimpor ulang data dari awal.</li>
+                </ul>
+            </div>
+
+            <form id="reset-data-form" class="mt-5" method="POST" action="{{ route('settings.data.reset') }}">
+                @csrf
+                @error('confirm_text') <p class="form-error">{{ $message }}</p> @enderror
+                <button class="btn-danger" type="button" data-reset-open>Reset data</button>
+            </form>
+        </section>
+    @endif
+
+    @if ($canViewSensitive ?? false)
+        <div id="reset-confirm-overlay" class="hidden fixed inset-0 z-[100] items-center justify-center bg-slate-950/60 p-4" style="backdrop-filter: blur(2px);">
+            <div id="reset-confirm-dialog" class="w-full max-w-md rounded-2xl bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.24),0_4px_16px_rgba(15,23,42,0.12)]">
+            <div class="flex items-start gap-3">
+                <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-rose-100 text-rose-700">
+                    <svg aria-hidden="true" class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+                </span>
+                <div class="min-w-0">
+                    <h2 class="text-base font-semibold text-slate-900">Hapus semua data transaksional?</h2>
+                    <p class="mt-1 text-sm leading-6 text-slate-600">Tindakan ini <strong>tidak dapat dibatalkan</strong>. Semua data pegawai, cuti, payroll, riwayat, dan log akan dihapus permanen. Salinan database tetap dibuat otomatis ke <code class="font-mono text-xs">storage/app/backups/</code> sebelum penghapusan.</p>
+                </div>
+            </div>
+
+            <div class="mt-6 border-t border-slate-100 pt-5">
+                <label class="form-label" for="confirm_text">Ketik <strong>RESET</strong> untuk konfirmasi</label>
+                <input class="form-input" id="confirm_text" name="confirm_text" type="text" autocomplete="off" maxlength="10" required form="reset-data-form">
+                <p class="form-help">Mengetik kata kunci memastikan penghapusan disengaja.</p>
+            </div>
+
+            <div class="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button class="btn-secondary" type="button" data-reset-cancel>Batal</button>
+                <button class="btn-danger" type="button" data-reset-confirm>
+                    <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.14-2.032-2.172a48.114 48.114 0 0 0-3.736 0C8.16 2.338 7.25 3.297 7.25 4.477v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
+                    Ya, hapus semua
+                </button>
+            </div>
+            </div>
+        </div>
+
+        <script>
+            (function () {
+                const openBtn = document.querySelector('[data-reset-open]');
+                const overlay = document.getElementById('reset-confirm-overlay');
+                const confirmBtn = document.querySelector('[data-reset-confirm]');
+                const form = document.getElementById('reset-data-form');
+
+                if (!openBtn || !overlay || !confirmBtn || !form) {
+                    return;
+                }
+
+                const openDialog = () => {
+                    overlay.classList.remove('hidden');
+                    overlay.classList.add('flex');
+                    document.body.style.overflow = 'hidden';
+                };
+
+                const closeDialog = () => {
+                    overlay.classList.add('hidden');
+                    overlay.classList.remove('flex');
+                    document.body.style.overflow = '';
+                };
+
+                openBtn.addEventListener('click', openDialog);
+
+                confirmBtn.addEventListener('click', () => {
+                    const input = document.getElementById('confirm_text');
+
+                    if (input.value.trim() !== 'RESET') {
+                        input.setCustomValidity('Ketik RESET untuk mengonfirmasi.');
+                        input.reportValidity();
+                        return;
+                    }
+
+                    input.setCustomValidity('');
+                    form.submit();
+                });
+
+                overlay.querySelector('[data-reset-cancel]')?.addEventListener('click', closeDialog);
+
+                overlay.addEventListener('click', (event) => {
+                    if (event.target === overlay) {
+                        closeDialog();
+                    }
+                });
+
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape' && !overlay.classList.contains('hidden')) {
+                        closeDialog();
+                    }
+                });
+            })();
+        </script>
+    @endif
 @endsection

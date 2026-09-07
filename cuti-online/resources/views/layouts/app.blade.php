@@ -22,12 +22,21 @@
                     </div>
                 </div>
 
+                @php
+                    $currentUser = auth()->user();
+                    $showLegacyMasterNavigation = $currentUser->isSuperAdmin()
+                        || strtolower(trim((string) $currentUser->role)) === 'operator';
+                @endphp
+
                 <nav class="mt-7 flex gap-1 overflow-x-auto pb-1 lg:flex-col">
-                    <p class="hidden px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 lg:block">Kepegawaian</p>
+                    @if ($showLegacyMasterNavigation)
+                        <p class="hidden px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 lg:block">Kepegawaian</p>
+                    @endif
                     <a class="sidebar-link {{ request()->routeIs('dashboard') ? 'sidebar-link-active' : '' }}" href="{{ route('dashboard') }}" data-workspace-link data-workspace-title="Dashboard">
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m3 13 9-9 9 9M5 11v9a1 1 0 0 0 1 1h3v-6h6v6h3a1 1 0 0 0 1-1v-9" /></svg>
                         Dashboard
                     </a>
+                    @if ($showLegacyMasterNavigation)
                     <a class="sidebar-link {{ request()->routeIs('employees.*') && ! request()->routeIs('employees.change-logs.*') ? 'sidebar-link-active' : '' }}" href="{{ route('employees.index') }}" data-workspace-link data-workspace-title="Pegawai">
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19a6 6 0 0 0-12 0m6-8a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm6 3a4 4 0 0 1 4 4m-4-7a3 3 0 1 0 0-6" /></svg>
                         Pegawai
@@ -40,11 +49,20 @@
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75A2.25 2.25 0 0 1 6.75 4.5h10.5a2.25 2.25 0 0 1 2.25 2.25v10.5a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25V6.75Zm0 3.75h15M8.25 14.25h2.25m2.25 0H15m-6.75 3h2.25m2.25 0H15" /></svg>
                         Payroll Bulanan
                     </a>
+                    @endif
                     <p class="hidden px-2 pb-1 pt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 lg:block">Layanan cuti</p>
                     <a class="sidebar-link {{ request()->routeIs('leave-requests.*') ? 'sidebar-link-active' : '' }}" href="{{ route('leave-requests.index') }}" data-workspace-link data-workspace-title="Formulir Cuti">
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                         Formulir Cuti
                     </a>
+                    @if ($currentUser->canManageAccounts())
+                        <p class="hidden px-2 pb-1 pt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 lg:block">Akses</p>
+                        <a class="sidebar-link {{ request()->routeIs('users.*') ? 'sidebar-link-active' : '' }}" href="{{ route('users.index') }}" data-workspace-link data-workspace-title="Akun & Unit">
+                            <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9.75a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Zm3.75 10.5a7.5 7.5 0 0 0-15 0M19.5 8.25v6m3-3h-6" /></svg>
+                            {{ $currentUser->isSuperAdmin() ? 'Akun & Unit' : 'Akun Pengguna' }}
+                        </a>
+                    @endif
+                    @if ($showLegacyMasterNavigation)
                     <a class="sidebar-link {{ request()->routeIs('document-templates.*') ? 'sidebar-link-active' : '' }}" href="{{ route('document-templates.index') }}" data-workspace-link data-workspace-title="Template Dokumen">
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5V6.75a3.375 3.375 0 0 0-3.375-3.375H7.875A3.375 3.375 0 0 0 4.5 6.75v10.5a3.375 3.375 0 0 0 3.375 3.375h4.5m3.75-3.375h.008v.008h-.008v-.008Zm-1.5 0h.008v.008h-.008v-.008Zm3 0h.008v.008h-.008v-.008Z" /></svg>
                         Template Dokumen
@@ -66,16 +84,20 @@
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m13.5 6.75 5.25 5.25-5.25 5.25M10.5 17.25 5.25 12l5.25-5.25" /></svg>
                         Integrasi API
                     </a>
+                    @endif
                 </nav>
 
                 <div class="card-inner mt-7 hidden lg:block">
                     <p class="text-xs font-semibold uppercase tracking-[0.14em] text-sky-700">SIMPEG</p>
-                    <p class="mt-2 text-sm leading-5 text-slate-600">Kelola profil dan riwayat pegawai, lalu buat formulir cuti dari data yang konsisten.</p>
+                    <p class="mt-2 text-sm leading-5 text-slate-600">Buat formulir cuti dari data pegawai yang sesuai dengan akses unit kerja Anda.</p>
                 </div>
 
                 <div class="mt-6 hidden border-t border-slate-100 pt-5 lg:block">
-                    <p class="px-2 text-sm font-semibold text-slate-800">{{ auth()->user()->name }}</p>
-                    <p class="mt-0.5 px-2 text-xs capitalize text-slate-500">{{ auth()->user()->role }}</p>
+                    <p class="px-2 text-sm font-semibold text-slate-800">{{ $currentUser->name }}</p>
+                    <p class="mt-0.5 px-2 text-xs text-slate-500">{{ $currentUser->roleLabel() }}</p>
+                    @if ($currentUser->department)
+                        <p class="mt-0.5 px-2 text-xs text-slate-400">{{ $currentUser->department->name }}</p>
+                    @endif
                     <form class="mt-3" method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button class="sidebar-link w-full" type="submit">
