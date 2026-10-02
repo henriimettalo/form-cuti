@@ -1,5 +1,114 @@
 const isWorkspaceFrame = window.self !== window.top;
 
+const navigationShell = document.querySelector('[data-navigation-shell]');
+
+if (navigationShell && !isWorkspaceFrame) {
+    const sidebar = navigationShell.querySelector('[data-sidebar]');
+    const toggle = navigationShell.querySelector('[data-sidebar-toggle]');
+    const toggleLabel = toggle.querySelector('[data-sidebar-toggle-label]');
+    const closeButton = sidebar.querySelector('[data-sidebar-close]');
+    const backdrop = navigationShell.querySelector('[data-sidebar-backdrop]');
+    const main = navigationShell.querySelector('main');
+    const desktop = window.matchMedia('(min-width: 48rem)');
+    let collapsed = false;
+    let mobileOpen = false;
+    let previousOverflow = '';
+
+    const syncNavigation = () => {
+        navigationShell.toggleAttribute('data-sidebar-collapsed', desktop.matches && collapsed);
+        navigationShell.toggleAttribute('data-sidebar-open', !desktop.matches && mobileOpen);
+        toggle.setAttribute('aria-expanded', String(desktop.matches ? !collapsed : mobileOpen));
+        toggleLabel.textContent = desktop.matches
+            ? (collapsed ? 'Tampilkan menu' : 'Sembunyikan menu')
+            : 'Menu';
+        backdrop.hidden = desktop.matches || !mobileOpen;
+
+        if (!desktop.matches && mobileOpen) {
+            sidebar.setAttribute('role', 'dialog');
+            sidebar.setAttribute('aria-modal', 'true');
+            main.inert = true;
+        } else {
+            sidebar.removeAttribute('role');
+            sidebar.removeAttribute('aria-modal');
+            main.inert = false;
+        }
+    };
+
+    const closeMobileMenu = (focusTarget = toggle) => {
+        if (!mobileOpen) {
+            return;
+        }
+
+        mobileOpen = false;
+        document.body.style.overflow = previousOverflow;
+        syncNavigation();
+        focusTarget.focus();
+    };
+
+    toggle.addEventListener('click', () => {
+        if (desktop.matches) {
+            collapsed = !collapsed;
+            syncNavigation();
+            return;
+        }
+
+        previousOverflow = document.body.style.overflow;
+        mobileOpen = true;
+        document.body.style.overflow = 'hidden';
+        syncNavigation();
+        closeButton.focus();
+    });
+
+    closeButton.addEventListener('click', () => closeMobileMenu());
+    backdrop.addEventListener('click', () => closeMobileMenu());
+    sidebar.addEventListener('click', (event) => {
+        const link = event.target.closest('a[data-workspace-link]');
+
+        if (link && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+            closeMobileMenu(main.querySelector('[role="tab"][aria-selected="true"]') ?? toggle);
+        }
+    });
+
+    sidebar.addEventListener('keydown', (event) => {
+        if (!mobileOpen || desktop.matches) {
+            return;
+        }
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeMobileMenu();
+        }
+
+        if (event.key === 'Tab') {
+            const controls = Array.from(sidebar.querySelectorAll('a[href], button:not([disabled])'))
+                .filter((control) => control.getClientRects().length > 0);
+            const first = controls[0];
+            const last = controls.at(-1);
+
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        }
+    });
+
+    desktop.addEventListener('change', () => {
+        const focusWasInSidebar = sidebar.contains(document.activeElement);
+        closeMobileMenu();
+        syncNavigation();
+
+        if (focusWasInSidebar && (!desktop.matches || collapsed)) {
+            toggle.focus();
+        }
+    });
+
+    navigationShell.setAttribute('data-navigation-ready', '');
+    syncNavigation();
+}
+
 if (isWorkspaceFrame) {
     let frameHeightUpdateQueued = false;
 

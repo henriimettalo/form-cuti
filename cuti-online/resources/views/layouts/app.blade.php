@@ -12,14 +12,18 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body>
-        <div class="app-shell lg:grid lg:grid-cols-[17.5rem_minmax(0,1fr)]">
-            <aside class="border-b border-slate-200 bg-white/85 px-4 py-4 backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-r lg:border-b-0 lg:px-5 lg:py-6">
+        <div class="app-shell" data-navigation-shell>
+            <div class="sidebar-backdrop" data-sidebar-backdrop hidden></div>
+            <aside id="app-sidebar" class="app-sidebar" aria-label="Menu SIMPEG" data-sidebar>
                 <div class="flex items-center gap-3 px-2">
                     <div class="grid size-10 place-items-center rounded-2xl bg-sky-600 text-sm font-bold tracking-tight text-white shadow-[0_8px_18px_rgba(2,132,199,0.24)]">SK</div>
                     <div>
                         <p class="text-sm font-semibold text-slate-950">SIMPEG</p>
                         <p class="text-xs text-slate-500">Sistem Kepegawaian</p>
                     </div>
+                    <button class="sidebar-control sidebar-close ml-auto" type="button" aria-label="Tutup menu" data-sidebar-close>
+                        <svg aria-hidden="true" class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" d="m6 6 12 12M6 18 18 6" /></svg>
+                    </button>
                 </div>
 
                 @php
@@ -28,9 +32,9 @@
                         || strtolower(trim((string) $currentUser->role)) === 'operator';
                 @endphp
 
-                <nav class="mt-7 flex gap-1 overflow-x-auto pb-1 lg:flex-col">
+                <nav class="mt-7 flex flex-col gap-1" aria-label="Navigasi utama">
                     @if ($showLegacyMasterNavigation)
-                        <p class="hidden px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 lg:block">Kepegawaian</p>
+                        <p class="sidebar-section">Kepegawaian</p>
                     @endif
                     <a class="sidebar-link {{ request()->routeIs('dashboard') ? 'sidebar-link-active' : '' }}" href="{{ route('dashboard') }}" data-workspace-link data-workspace-title="Dashboard">
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m3 13 9-9 9 9M5 11v9a1 1 0 0 0 1 1h3v-6h6v6h3a1 1 0 0 0 1-1v-9" /></svg>
@@ -50,13 +54,13 @@
                         Payroll Bulanan
                     </a>
                     @endif
-                    <p class="hidden px-2 pb-1 pt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 lg:block">Layanan cuti</p>
+                    <p class="sidebar-section mt-4">Layanan cuti</p>
                     <a class="sidebar-link {{ request()->routeIs('leave-requests.*') ? 'sidebar-link-active' : '' }}" href="{{ route('leave-requests.index') }}" data-workspace-link data-workspace-title="Formulir Cuti">
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                         Formulir Cuti
                     </a>
                     @if ($currentUser->canManageAccounts())
-                        <p class="hidden px-2 pb-1 pt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 lg:block">Akses</p>
+                        <p class="sidebar-section mt-4">Akses</p>
                         <a class="sidebar-link {{ request()->routeIs('users.*') ? 'sidebar-link-active' : '' }}" href="{{ route('users.index') }}" data-workspace-link data-workspace-title="Akun & Unit">
                             <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9.75a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Zm3.75 10.5a7.5 7.5 0 0 0-15 0M19.5 8.25v6m3-3h-6" /></svg>
                             {{ $currentUser->isSuperAdmin() ? 'Akun & Unit' : 'Akun Pengguna' }}
@@ -79,7 +83,7 @@
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h3m-3 12h3m4.5-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM6 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm0 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                         Pengaturan cuti
                     </a>
-                    <p class="hidden px-2 pb-1 pt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 lg:block">Integrasi</p>
+                    <p class="sidebar-section mt-4">Integrasi</p>
                     <a class="sidebar-link {{ request()->routeIs('api-tokens.*') ? 'sidebar-link-active' : '' }}" href="{{ route('api-tokens.index') }}" data-workspace-link data-workspace-title="Integrasi API">
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m13.5 6.75 5.25 5.25-5.25 5.25M10.5 17.25 5.25 12l5.25-5.25" /></svg>
                         Integrasi API
@@ -87,16 +91,16 @@
                     @endif
                 </nav>
 
-                <div class="card-inner mt-7 hidden lg:block">
+                <div class="card-inner mt-7">
                     <p class="text-xs font-semibold uppercase tracking-[0.14em] text-sky-700">SIMPEG</p>
                     <p class="mt-2 text-sm leading-5 text-slate-600">Buat formulir cuti dari data pegawai yang sesuai dengan akses unit kerja Anda.</p>
                 </div>
 
-                <div class="mt-6 hidden border-t border-slate-100 pt-5 lg:block">
+                <div class="mt-6 border-t border-slate-200 pt-5">
                     <p class="px-2 text-sm font-semibold text-slate-800">{{ $currentUser->name }}</p>
                     <p class="mt-0.5 px-2 text-xs text-slate-500">{{ $currentUser->roleLabel() }}</p>
                     @if ($currentUser->department)
-                        <p class="mt-0.5 px-2 text-xs text-slate-400">{{ $currentUser->department->name }}</p>
+                        <p class="mt-0.5 break-words px-2 text-xs text-slate-500">{{ $currentUser->department->name }}</p>
                     @endif
                     <form class="mt-3" method="POST" action="{{ route('logout') }}">
                         @csrf
@@ -110,6 +114,13 @@
 
             <main class="min-w-0 px-4 py-6 sm:px-6 lg:px-10 lg:py-9" data-workspace-root data-workspace-dashboard-url="{{ route('dashboard') }}">
                 <div class="mx-auto max-w-6xl">
+                    <div class="navigation-toolbar" data-navigation-toolbar>
+                        <button class="sidebar-control" type="button" aria-controls="app-sidebar" aria-expanded="true" data-sidebar-toggle>
+                            <svg aria-hidden="true" class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                            <span data-sidebar-toggle-label>Menu</span>
+                        </button>
+                        <span class="text-sm font-semibold text-slate-700 md:hidden">SIMPEG</span>
+                    </div>
                     <div class="workspace-tabs" data-workspace-tabs>
                         <div class="workspace-tablist" role="tablist" aria-label="Halaman yang dibuka">
                             <div class="workspace-tab workspace-tab-active" data-workspace-tab data-workspace-tab-id="initial" data-workspace-url="{{ url()->full() }}">
