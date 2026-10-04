@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\PayrollImportValidationException;
 use App\Models\AuditLog;
 use App\Models\Bank;
 use App\Models\Employee;
@@ -10,6 +11,7 @@ use App\Models\EmployeePayroll;
 use App\Models\PayrollImport;
 use App\Models\PayrollPeriod;
 use App\Models\Position;
+use App\Support\EmployeeImportColumns;
 use App\Support\EmployeeNipMetadata;
 use App\Support\EmployeeRankOptions;
 use DateTimeImmutable;
@@ -181,17 +183,20 @@ class PayrollImportService
         int $month,
         ?int $createdBy = null,
         string $sourceType = PayrollImport::SOURCE_PRIMARY,
+        bool $employeeDataOnly = false,
     ): PayrollImport {
         $this->lastMasterChanges = [
             'total' => 0,
             'items' => [],
         ];
-        $this->preserveExistingMaster = $sourceType === PayrollImport::SOURCE_TPP;
+        $this->preserveExistingMaster = ! $employeeDataOnly && $sourceType === PayrollImport::SOURCE_TPP;
 
-        $this->assertPeriodAvailable($year, $month, $sourceType);
+        if (! $employeeDataOnly) {
+            $this->assertPeriodAvailable($year, $month, $sourceType);
+        }
         $path = $file->getRealPath();
         $checksum = $path === false ? null : (hash_file('sha256', $path) ?: null);
-        [$rows, $normalizedRows, $errors] = $this->prepareRows($file, $sourceType);
+        [$rows, $normalizedRows, $errors] = $this->prepareRows($file, $sourceType, $employeeDataOnly);
 
         $registeredEmployees = $this->registeredEmployees();
         $seenNips = [];
@@ -208,7 +213,7 @@ class PayrollImportService
             }
         }
 
-        if ($sourceType === PayrollImport::SOURCE_TPP) {
+        if (! $employeeDataOnly && $sourceType === PayrollImport::SOURCE_TPP) {
             $period = PayrollPeriod::query()
                 ->where('year', $year)
                 ->where('month', $month)
@@ -234,6 +239,7 @@ class PayrollImportService
             'year' => $year,
             'month' => $month,
             'source_type' => $sourceType,
+            'employee_data_only' => $employeeDataOnly,
             'original_filename' => $file->getClientOriginalName(),
             'source_checksum' => $checksum,
             'total_rows' => count($rows),
@@ -244,12 +250,68 @@ class PayrollImportService
         ]);
     }
 
+    public function confirmEmployeeData(
+        PayrollImport $payrollImport,
+        ?int $importedBy = null,
+        ?string $ipAddress = null,
+        ?string $userAgent = null,
+    ): int {
+        $this->preserveExistingMaster = false;
+        [$count, $changes] = DB::transaction(function () use ($payrollImport, $importedBy, $ipAddress, $userAgent): array {
+            $locked = PayrollImport::query()->lockForUpdate()->findOrFail($payrollImport->id);
+            if (! $locked->employee_data_only) {
+                throw new LogicException('Pratinjau lama masih memuat nominal payroll. Unggah ulang file untuk mengimpor data pegawai saja.');
+            }
+            if ($locked->status === PayrollImport::STATUS_COMPLETED) {
+                return [$locked->imported_rows, $locked->master_changes['items'] ?? []];
+            }
+            if ($locked->status !== PayrollImport::STATUS_PREVIEWED) {
+                throw new LogicException('Pratinjau ini tidak dapat diproses lagi. Unggah file baru.');
+            }
+            $rows = $locked->payload ?? [];
+            $employees = $this->registeredEmployees();
+            $changes = $this->masterChangesForRows($rows, $employees);
+            if ($this->changeSignature($changes) !== $this->changeSignature($locked->master_changes['items'] ?? [])) {
+                throw new LogicException('Data master berubah setelah pratinjau dibuat. Unggah ulang file untuk mendapatkan perbandingan terbaru.');
+            }
+            foreach ($rows as $row) {
+                $employee = $employees->get($row['nip_lookup']);
+                if ($employee === null) {
+                    throw new InvalidArgumentException("Baris {$row['source_row_number']}: pegawai tidak lagi terdaftar. Unggah ulang file.");
+                }
+                $fieldChanges = $this->masterFieldChanges($employee, $row);
+                if ($fieldChanges !== []) {
+                    $this->recordMasterChangeAudit($employee, $fieldChanges, $locked, null,
+                        (int) $row['source_row_number'], $importedBy, $ipAddress, $userAgent);
+                }
+                $this->updateExistingEmployee($employee, $row);
+                $this->upsertBankAccount($employee, $row, allowIncompleteBank: true);
+                if (isset($row['_import_api_fields'])) {
+                    $employee->update(['imported_api_fields' => $row['_import_api_fields']]);
+                }
+            }
+            $locked->update([
+                'status' => PayrollImport::STATUS_COMPLETED,
+                'imported_rows' => count($rows),
+                'processed_at' => now(),
+            ]);
+
+            return [count($rows), $changes];
+        });
+        $this->lastMasterChanges = $this->changeReport($changes);
+
+        return $count;
+    }
+
     public function confirm(
         PayrollImport $payrollImport,
         ?int $importedBy = null,
         ?string $ipAddress = null,
         ?string $userAgent = null,
     ): PayrollPeriod {
+        if ($payrollImport->employee_data_only) {
+            throw new LogicException('Impor ini hanya untuk data pegawai, gunakan konfirmasi data pegawai.');
+        }
         $this->lastMasterChanges = [
             'total' => 0,
             'items' => [],
@@ -512,7 +574,7 @@ class PayrollImportService
     /**
      * @return array{0: list<array<int, mixed>>, 1: list<array<string, mixed>>, 2: list<string>}
      */
-    private function prepareRows(UploadedFile $file, string $sourceType): array
+    private function prepareRows(UploadedFile $file, string $sourceType, bool $employeeDataOnly = false): array
     {
         $rows = $this->readRows($file);
 
@@ -525,6 +587,22 @@ class PayrollImportService
         $requiredColumns = $sourceType === PayrollImport::SOURCE_TPP
             ? self::TPP_REQUIRED_COLUMNS
             : self::REQUIRED_COLUMNS;
+        if ($employeeDataOnly) {
+            $requiredColumns = ['nip', 'employee_name', 'employment_status', 'grade'];
+            // Financial cells cannot affect employee-only validation or enter its payload.
+            $ignored = array_merge(EmployeePayroll::COMPONENTS, EmployeePayroll::TPP_COMPONENTS, [
+                'source_total_earnings', 'source_total_deductions', 'source_transferred_amount',
+                'tpp_total', 'tpp_total_deductions', 'tpp_transferred_amount',
+            ]);
+            foreach ($ignored as $field) {
+                if ($headerMap[$field] !== null) {
+                    foreach ($rows as &$row) {
+                        $row[$headerMap[$field]] = null;
+                    }
+                    unset($row);
+                }
+            }
+        }
         $missingColumns = array_values(array_filter(
             $requiredColumns,
             static fn (string $column): bool => $headerMap[$column] === null,
@@ -535,7 +613,7 @@ class PayrollImportService
             throw new InvalidArgumentException('Kolom wajib untuk template '.$template.' tidak ditemukan: '.implode(', ', $missingColumns).'. Periksa jenis file yang dipilih.');
         }
 
-        $rows = array_values(array_filter($rows, fn (array $row): bool => ! $this->isBlankRow($row)));
+        $rows = array_filter($rows, fn (array $row): bool => ! $this->isBlankRow($row));
 
         if ($rows === []) {
             throw new InvalidArgumentException('File payroll belum memiliki baris pegawai.');
@@ -550,7 +628,7 @@ class PayrollImportService
 
         foreach ($rows as $index => $row) {
             $rowNumber = $index + 2;
-            [$data, $messages] = $this->normalizeRow($row, $headerMap);
+            [$data, $messages] = $this->normalizeRow($row, $headerMap, $employeeDataOnly);
 
             if ($messages !== []) {
                 $errors[] = 'Baris '.$rowNumber.': '.implode(' ', $messages);
@@ -563,7 +641,7 @@ class PayrollImportService
             $normalizedRows[] = $data;
         }
 
-        return [$rows, $normalizedRows, $errors];
+        return [array_values($rows), $normalizedRows, $errors];
     }
 
     private function throwIfErrors(array $errors): void
@@ -572,14 +650,7 @@ class PayrollImportService
             return;
         }
 
-        $reportedErrors = array_slice($errors, 0, 30);
-        $remainingErrors = count($errors) - count($reportedErrors);
-
-        if ($remainingErrors > 0) {
-            $reportedErrors[] = "... dan {$remainingErrors} masalah lainnya.";
-        }
-
-        throw new InvalidArgumentException("Data payroll tidak lolos validasi:\n- ".implode("\n- ", $reportedErrors));
+        throw new PayrollImportValidationException($errors);
     }
 
     /** @return Collection<string, Employee> */
@@ -637,7 +708,7 @@ class PayrollImportService
         Employee $employee,
         array $changes,
         PayrollImport $payrollImport,
-        PayrollPeriod $period,
+        ?PayrollPeriod $period,
         int $sourceRowNumber,
         ?int $importedBy,
         ?string $ipAddress,
@@ -661,8 +732,8 @@ class PayrollImportService
             'metadata' => [
                 'source' => 'payroll_import',
                 'payroll_import_id' => $payrollImport->id,
-                'payroll_period_id' => $period->id,
-                'payroll_period' => $period->label(),
+                'payroll_period_id' => $period?->id,
+                'payroll_period' => $period?->label() ?? sprintf('%02d/%d', $payrollImport->month, $payrollImport->year),
                 'source_file' => $payrollImport->original_filename,
                 'source_row_number' => $sourceRowNumber,
                 'uploaded_at' => $payrollImport->created_at?->toIso8601String(),
@@ -674,7 +745,7 @@ class PayrollImportService
     }
 
     /** @return array{0: array<string, mixed>, 1: list<string>} */
-    private function normalizeRow(array $row, array $headerMap): array
+    private function normalizeRow(array $row, array $headerMap, bool $employeeDataOnly = false): array
     {
         $sourceNip = $this->cellValue($row, $headerMap['nip']);
         $employeeNip = EmployeeNipMetadata::digits($sourceNip);
@@ -747,22 +818,25 @@ class PayrollImportService
         }
 
         $data['_provided_master_fields'] = array_values(array_unique($providedMasterFields));
+        $data['_import_api_fields'] = EmployeeImportColumns::fromHeaderMap($headerMap);
 
-        foreach (EmployeePayroll::COMPONENTS as $component) {
-            $data[$component] = $this->moneyValue($this->cellValue($row, $headerMap[$component]));
+        if (! $employeeDataOnly) {
+            foreach (EmployeePayroll::COMPONENTS as $component) {
+                $data[$component] = $this->moneyValue($this->cellValue($row, $headerMap[$component]));
+            }
+
+            $data['source_total_earnings'] = $this->moneyValue($this->cellValue($row, $headerMap['source_total_earnings']));
+            $data['source_total_deductions'] = $this->moneyValue($this->cellValue($row, $headerMap['source_total_deductions']));
+            $data['source_transferred_amount'] = $this->moneyValue($this->cellValue($row, $headerMap['source_transferred_amount']));
+
+            foreach (EmployeePayroll::TPP_COMPONENTS as $component) {
+                $data[$component] = $this->moneyValue($this->cellValue($row, $headerMap[$component]));
+            }
+
+            $data['tpp_source_total'] = $this->moneyValue($this->cellValue($row, $headerMap['tpp_total']));
+            $data['tpp_source_total_deductions'] = $this->moneyValue($this->cellValue($row, $headerMap['tpp_total_deductions']));
+            $data['tpp_source_transferred_amount'] = $this->moneyValue($this->cellValue($row, $headerMap['tpp_transferred_amount']));
         }
-
-        $data['source_total_earnings'] = $this->moneyValue($this->cellValue($row, $headerMap['source_total_earnings']));
-        $data['source_total_deductions'] = $this->moneyValue($this->cellValue($row, $headerMap['source_total_deductions']));
-        $data['source_transferred_amount'] = $this->moneyValue($this->cellValue($row, $headerMap['source_transferred_amount']));
-
-        foreach (EmployeePayroll::TPP_COMPONENTS as $component) {
-            $data[$component] = $this->moneyValue($this->cellValue($row, $headerMap[$component]));
-        }
-
-        $data['tpp_source_total'] = $this->moneyValue($this->cellValue($row, $headerMap['tpp_total']));
-        $data['tpp_source_total_deductions'] = $this->moneyValue($this->cellValue($row, $headerMap['tpp_total_deductions']));
-        $data['tpp_source_transferred_amount'] = $this->moneyValue($this->cellValue($row, $headerMap['tpp_transferred_amount']));
 
         $messages = [];
 
@@ -784,8 +858,8 @@ class PayrollImportService
             $messages[] = 'Golongan PNS tidak dikenali: '.($gradeValue ?: '(kosong)').'.';
         }
 
-        if ($data['position_type'] !== null && ! in_array($data['position_type'], [1, 3], true)) {
-            $messages[] = 'Tipe jabatan hanya boleh 1 atau 3.';
+        if ($data['position_type'] !== null && ! array_key_exists($data['position_type'], Employee::POSITION_TYPES)) {
+            $messages[] = 'Tipe jabatan hanya boleh 1, 2, atau 3.';
         }
 
         if ($data['marital_status'] !== null && ! in_array($data['marital_status'], [1, 2], true)) {
@@ -960,10 +1034,7 @@ class PayrollImportService
         }
 
         return match ($field) {
-            'position_type' => [
-                1 => 'Struktural',
-                3 => 'Fungsional Umum',
-            ][(int) $value] ?? (string) $value,
+            'position_type' => Employee::POSITION_TYPES[(int) $value] ?? (string) $value,
             'marital_status' => [
                 1 => 'Menikah',
                 2 => 'Belum menikah',
@@ -973,32 +1044,40 @@ class PayrollImportService
         };
     }
 
-    private function upsertBankAccount(Employee $employee, array $row): ?EmployeeBankAccount
+    private function upsertBankAccount(Employee $employee, array $row, bool $allowIncompleteBank = false): ?EmployeeBankAccount
     {
         if ($this->preserveExistingMaster) {
             return null;
         }
 
-        if ($row['bank_code'] === null || $row['bank_name'] === null || $row['account_number'] === null) {
+        if ($row['account_number'] === null || (! $allowIncompleteBank && ($row['bank_code'] === null || $row['bank_name'] === null))) {
             return null;
         }
 
-        $bank = Bank::query()->updateOrCreate(
+        if ($allowIncompleteBank) {
+            $existing = $employee->bankAccounts()->where('account_number', $row['account_number'])
+                ->when($row['bank_code'] !== null, fn ($query) => $query->where('bank_code', $row['bank_code']))
+                ->orderByDesc('is_primary')->first();
+            $row['bank_code'] ??= $existing?->bank_code;
+            $row['bank_name'] ??= $existing?->bank_name;
+        }
+
+        $bank = $row['bank_code'] !== null && $row['bank_name'] !== null ? Bank::query()->updateOrCreate(
             ['code' => $row['bank_code']],
             [
                 'name' => $row['bank_name'],
                 'is_active' => true,
             ],
-        );
+        ) : null;
 
         $account = $employee->bankAccounts()->updateOrCreate(
             [
-                'bank_code' => $row['bank_code'],
+                'bank_code' => $row['bank_code'] ?? '',
                 'account_number' => $row['account_number'],
             ],
             [
-                'bank_id' => $bank->id,
-                'bank_name' => $row['bank_name'],
+                'bank_id' => $bank?->id,
+                'bank_name' => $row['bank_name'] ?? '',
                 'is_primary' => true,
             ],
         );
@@ -1247,7 +1326,8 @@ class PayrollImportService
     private function isBlankRow(array $row): bool
     {
         foreach ($row as $value) {
-            if (trim((string) $value) !== '') {
+            $text = trim((string) $value);
+            if ($text !== '' && ! preg_match('/^[+-]?0+(?:[.,]0+)*$/', $text)) {
                 return false;
             }
         }

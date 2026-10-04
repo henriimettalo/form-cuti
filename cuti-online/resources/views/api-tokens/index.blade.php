@@ -93,6 +93,8 @@
                 <div class="rounded-xl bg-slate-50 p-4">
                     <p class="font-mono font-semibold text-slate-800">GET {{ $apiBaseUrl }}/employees</p>
                     <p class="mt-1 leading-5 text-slate-500">Daftar pegawai. Izin: <code>employees:read</code>.</p>
+                    <p class="mt-2 leading-5 text-slate-500">Tambahkan <code>?view=imported</code> untuk mengembalikan hanya kolom yang dikenali dari file impor terakhir tiap pegawai. Berlaku juga untuk <code>/employees/NIP</code>. NIK dan rekening memerlukan izin <code>employees:profile</code>.</p>
+                    <p class="mt-2 leading-5 text-slate-500">Mode ini mengembalikan data pegawai saat ini. Untuk impor lama yang belum mencatat kolom sumber, hanya NIP dikembalikan; impor ulang agar kolomnya tercatat.</p>
                 </div>
                 <div class="rounded-xl bg-slate-50 p-4">
                     <p class="font-mono font-semibold text-slate-800">POST {{ $apiBaseUrl }}/employees</p>

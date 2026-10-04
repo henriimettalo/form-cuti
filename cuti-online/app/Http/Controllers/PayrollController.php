@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\PayrollImportValidationException;
 use App\Models\EmployeePayroll;
 use App\Models\PayrollImport;
 use App\Models\PayrollPeriod;
@@ -27,6 +28,8 @@ class PayrollController extends Controller
     public function index(): View
     {
         return view('payroll.index', [
+            'employeeImports' => PayrollImport::query()->where('employee_data_only', true)
+                ->where('status', PayrollImport::STATUS_COMPLETED)->latest('processed_at')->limit(20)->get(),
             'periods' => PayrollPeriod::query()
                 ->withCount('records')
                 ->withCount([
@@ -90,9 +93,14 @@ class PayrollController extends Controller
                 (int) $data['month'],
                 $request->user()?->id,
                 $data['source_type'] ?? PayrollImport::SOURCE_PRIMARY,
+                employeeDataOnly: true,
             );
         } catch (InvalidArgumentException $exception) {
-            return back()->withInput()->withErrors(['file' => $exception->getMessage()]);
+            return back()->withInput()->withErrors([
+                'file' => $exception instanceof PayrollImportValidationException
+                    ? $exception->issues
+                    : $exception->getMessage(),
+            ]);
         }
 
         return to_route('payroll.import.preview', $payrollImport);
@@ -127,7 +135,7 @@ class PayrollController extends Controller
     public function confirm(Request $request, PayrollImport $payrollImport): RedirectResponse
     {
         try {
-            $period = $this->imports->confirm(
+            $count = $this->imports->confirmEmployeeData(
                 $payrollImport,
                 $request->user()?->id,
                 $request->ip(),
@@ -139,13 +147,13 @@ class PayrollController extends Controller
         }
 
         $masterChanges = $this->imports->lastMasterChanges();
-        $status = "Payroll {$period->label()} berhasil diimpor sebagai draf.";
+        $status = "Data {$count} pegawai berhasil diproses dari file payroll.";
 
         if ($masterChanges['total'] > 0) {
-            $status .= " Terdeteksi {$masterChanges['total']} perubahan data master; rincian ditampilkan di halaman periode.";
+            $status .= " {$masterChanges['total']} pegawai memiliki perubahan; rincian tersedia di Log perubahan.";
         }
 
-        return to_route('payroll.show', $period)
+        return to_route('employees.index')
             ->with('status', $status)
             ->with('payroll_changes', $masterChanges);
     }

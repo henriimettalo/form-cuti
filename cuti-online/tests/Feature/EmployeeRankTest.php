@@ -38,7 +38,8 @@ class EmployeeRankTest extends TestCase
 
         $this->actingAs($operator)->get(route('employees.index'))
             ->assertOk()
-            ->assertSee('Penata Muda Tingkat I (III/b)')
+            ->assertSee('Penata Muda Tk. 1')
+            ->assertSee('III/b')
             ->assertDontSee('Penata Muda Tingkat I III/b');
     }
 
@@ -80,7 +81,8 @@ class EmployeeRankTest extends TestCase
 
         $this->actingAs($operator)->get(route('employees.index'))
             ->assertOk()
-            ->assertSee('Golongan IX')
+            ->assertSee('Golongan')
+            ->assertSee('IX')
             ->assertDontSee('Golongan (IX)');
     }
 

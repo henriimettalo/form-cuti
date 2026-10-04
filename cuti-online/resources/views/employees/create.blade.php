@@ -9,7 +9,7 @@
             <h1 class="page-title mt-2">Tambah pegawai</h1>
             <p class="page-description">Data jabatan disimpan sebagai master data. Unit kerja mengikuti profil instansi aplikasi.</p>
         </div>
-        <a class="btn-secondary shrink-0" href="{{ route('employees.index') }}">Kembali</a>
+        <a class="btn-secondary shrink-0" href="{{ route('employees.index') }}">Kembali ke pegawai</a>
     </div>
 
     @include('employees._form', [

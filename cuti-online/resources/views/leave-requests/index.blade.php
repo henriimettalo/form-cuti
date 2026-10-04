@@ -9,9 +9,9 @@
             <h1 class="page-title mt-2">Formulir cuti</h1>
             <p class="page-description">Setiap formulir tersimpan bersama snapshot data dan file Word hasilnya.</p>
         </div>
-        <a class="btn-primary shrink-0" href="{{ route('leave-requests.create') }}" data-workspace-link data-workspace-title="Buat Formulir">
+        <a class="btn-primary shrink-0" href="{{ route('leave-requests.create') }}" data-workspace-link data-workspace-title="Buat Formulir Cuti">
             <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-            Buat formulir
+            Buat formulir cuti
         </a>
     </div>
 
@@ -20,7 +20,7 @@
             <div class="card-inner text-center">
                 <p class="text-sm font-medium text-slate-700">Belum ada formulir.</p>
                 <p class="mt-1 text-sm text-slate-500">Pastikan data pegawai tersedia, lalu buat formulir pertama.</p>
-                <a class="btn-primary mt-4" href="{{ route('leave-requests.create') }}" data-workspace-link data-workspace-title="Buat Formulir">Buat formulir</a>
+                <a class="btn-primary mt-4" href="{{ route('leave-requests.create') }}" data-workspace-link data-workspace-title="Buat Formulir Cuti">Buat formulir cuti</a>
             </div>
         @else
             <div class="overflow-x-auto">

@@ -6,23 +6,14 @@
     <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
         <div class="min-w-0">
             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">{{ $showArchived ? 'Arsip data' : 'Master data' }}</p>
-            <h1 class="page-title mt-2">{{ $showArchived ? 'Arsip pegawai' : 'Pegawai' }}</h1>
+            <h1 class="page-title mt-2" data-sticky-page-title>{{ $showArchived ? 'Arsip pegawai' : 'Pegawai' }}</h1>
             <p class="page-description">{{ $showArchived ? 'Data pegawai yang diarsipkan tidak dapat dipilih pada formulir cuti, tetapi tetap dapat dipulihkan kapan saja.' : 'Kelola profil, pangkat, jabatan, dan unit kerja pegawai. Modul cuti memakai data aktif dari sini.' }}</p>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
-            @if ($showArchived)
-                <a class="btn-secondary shrink-0" href="{{ route('employees.index', ['per_page' => $perPage]) }}">
-                    <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
-                    Pegawai aktif
-                </a>
-            @else
-                <a class="btn-secondary shrink-0" href="{{ route('employees.index', ['archived' => 1, 'per_page' => $perPage]) }}">
-                    <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 7.5V6A2.25 2.25 0 0 1 6 3.75h12A2.25 2.25 0 0 1 20.25 6v1.5M3.75 7.5h16.5m-16.5 0v10.75A2.25 2.25 0 0 0 6 20.5h12a2.25 2.25 0 0 0 2.25-2.25V7.5" /></svg>
-                    Arsip pegawai
-                </a>
-                <a class="btn-secondary shrink-0" href="{{ route('employees.identity-import.create') }}">
+            @if (! $showArchived)
+                <a class="btn-secondary shrink-0" href="{{ route('employees.identity-import.create') }}" data-import-modal-link>
                     <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5v-9m0 9 3.75-3.75M12 16.5 8.25 12.75M4.5 18.75v.75A1.5 1.5 0 0 0 6 21h12a1.5 1.5 0 0 0 1.5-1.5v-.75" /></svg>
-                    Impor identitas
+                    Impor pegawai
                 </a>
                 <a class="btn-secondary shrink-0" href="{{ route('employees.change-logs.index') }}">
                     Log perubahan
@@ -35,7 +26,24 @@
         </div>
     </div>
 
-    <form class="card mt-7" id="employee-filter-form" method="GET" action="{{ route('employees.index') }}">
+    @php
+        $listFilters = array_filter([
+            'search' => $filters['search'],
+            'employment_status' => $filters['employment_status'],
+            'department_id' => $filters['department_id'],
+            'per_page' => $perPage,
+        ], static fn ($value) => $value !== null && $value !== '');
+    @endphp
+    <nav class="employee-list-tabs mt-7" aria-label="Daftar dan arsip pegawai">
+        <a @class(['employee-list-tab', 'employee-list-tab-active' => ! $showArchived])
+           href="{{ route('employees.index', $listFilters) }}"
+           @if (! $showArchived) aria-current="page" @endif>Daftar pegawai</a>
+        <a @class(['employee-list-tab', 'employee-list-tab-active' => $showArchived])
+           href="{{ route('employees.index', $listFilters + ['archived' => 1]) }}"
+           @if ($showArchived) aria-current="page" @endif>Arsip pegawai</a>
+    </nav>
+
+    <form class="card mt-5" id="employee-filter-form" method="GET" action="{{ route('employees.index') }}">
         @if ($showArchived)
             <input type="hidden" name="archived" value="1">
         @endif
@@ -90,7 +98,7 @@
                     Cari
                 </button>
                 @if ($hasFilters)
-                    <a class="btn-secondary" href="{{ route('employees.index', $showArchived ? ['archived' => 1, 'per_page' => $perPage] : ['per_page' => $perPage]) }}">Reset</a>
+                    <a class="btn-secondary" href="{{ route('employees.index', $showArchived ? ['archived' => 1, 'per_page' => $perPage] : ['per_page' => $perPage]) }}">Hapus filter</a>
                 @endif
             </div>
         </div>
@@ -137,7 +145,7 @@
                     </div>
                     <div class="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center">
                         <button type="button" class="min-h-11 w-full rounded-lg px-3 text-sm font-medium text-slate-600 transition-[background-color,color,transform] duration-150 hover:bg-white/80 hover:text-slate-950 active:scale-[0.96] sm:w-auto" data-bulk-action-clear>Bersihkan pilihan</button>
-                        <button type="submit" class="btn-danger w-full sm:w-auto" form="employee-bulk-form" onclick="return confirm('Arsipkan pegawai yang dipilih? Data dan riwayat tetap tersimpan dan dapat dipulihkan.')">
+                        <button type="submit" class="btn-danger w-full sm:w-auto" form="employee-bulk-form" data-confirm-title="Arsipkan pegawai yang dipilih?" data-confirm-message="Data dan riwayat tetap tersimpan dan dapat dipulihkan." data-confirm-button="Arsipkan pegawai">
                             Arsipkan terpilih
                         </button>
                     </div>
@@ -148,7 +156,7 @@
                 </form>
             @endif
             <div class="overflow-x-auto pb-1">
-                <table class="min-w-[76rem] w-full text-left text-sm">
+                <table class="min-w-[55rem] w-full text-left text-sm">
                     <thead class="sticky top-0 z-10 bg-white/95 text-xs uppercase tracking-[0.08em] text-slate-400 backdrop-blur">
                         <tr>
                             @if ($canBulkDelete && ! $showArchived)
@@ -160,9 +168,7 @@
                                 </th>
                             @endif
                             <th class="min-w-64 whitespace-nowrap pb-3 pr-6 font-semibold">Pegawai</th>
-                            <th class="min-w-40 whitespace-nowrap pb-3 pr-6 font-semibold">NIP</th>
-                            <th class="min-w-48 whitespace-nowrap pb-3 pr-6 font-semibold">Pangkat</th>
-                            <th class="min-w-44 whitespace-nowrap pb-3 pr-6 font-semibold">Jabatan</th>
+                            <th class="min-w-48 whitespace-nowrap pb-3 pr-6 font-semibold">Pangkat/Golongan</th>
                             <th class="min-w-48 whitespace-nowrap pb-3 pr-6 font-semibold">Unit kerja</th>
                             <th class="min-w-24 whitespace-nowrap pb-3 pr-6 font-semibold">Status</th>
                             <th class="w-16 whitespace-nowrap pb-3 text-right font-semibold">Aksi</th>
@@ -179,11 +185,15 @@
                                         </label>
                                     </td>
                                 @endif
-                                <td class="py-3.5 pr-6 align-middle font-semibold leading-6 text-slate-800">{{ $employee->full_name }}</td>
-                                <td class="whitespace-nowrap py-3.5 pr-6 align-middle font-mono text-xs tabular-nums text-slate-600">{{ $employee->nip }}</td>
-                                <td class="py-3.5 pr-6 align-middle leading-6 text-slate-600">{{ \App\Support\EmployeeRankOptions::format($employee->employment_status, $employee->rank_name, $employee->grade) }}</td>
-                                <td class="py-3.5 pr-6 align-middle leading-6 text-slate-600">{{ $employee->position?->name ?? $employee->position_title }}</td>
-                                <td class="py-3.5 pr-6 align-middle leading-6 text-slate-600">{{ $employee->positionHistories->firstWhere('department_name')?->department_name ?? $employee->department?->name ?? '-' }}</td>
+                                <td class="py-3.5 pr-6 align-middle">
+                                    <div class="font-semibold leading-6 text-slate-800">{{ $employee->full_name }}</div>
+                                    <div class="mt-1 whitespace-nowrap font-mono text-xs tabular-nums text-slate-600" role="group" aria-label="NIP {{ $employee->nip }}">{{ $employee->nip }}</div>
+                                </td>
+                                <td class="py-3.5 pr-6 align-middle text-slate-600">
+                                    <div class="leading-6">{{ preg_replace('/\bTingkat I\b/ui', 'Tk. 1', trim((string) $employee->rank_name)) ?: '—' }}</div>
+                                    <div class="mt-1 text-xs leading-5">{{ $employee->grade ?: '—' }}</div>
+                                </td>
+                                <td class="py-3.5 pr-6 align-middle leading-6 text-slate-600">{{ $employee->department?->name ?? $employee->positionHistories->firstWhere('department_name')?->department_name ?? '-' }}</td>
                                 <td class="whitespace-nowrap py-3.5 pr-6 align-middle"><span class="{{ $showArchived ? 'status-void' : ($employee->is_active ? 'status-generated' : 'status-void') }}">{{ $showArchived ? 'Diarsipkan' : ($employee->is_active ? 'Aktif' : 'Nonaktif') }}</span></td>
                                 <td class="py-3.5 text-right align-middle">
                                     <div class="inline-block text-left" data-employee-actions>
@@ -210,7 +220,7 @@
                                                     Edit
                                                 </a>
                                                 <div class="my-1 border-t border-slate-100"></div>
-                                                <form method="POST" action="{{ route('employees.destroy', $employee) }}" onsubmit="return confirm('Arsipkan pegawai ini? Data dan riwayat tetap tersimpan dan dapat dipulihkan.')">
+                                                <form method="POST" action="{{ route('employees.destroy', $employee) }}" data-confirm-title="Arsipkan pegawai?" data-confirm-message="Data dan riwayat tetap tersimpan dan dapat dipulihkan." data-confirm-button="Arsipkan pegawai">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button class="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium text-rose-700 transition-[background-color,color,transform] duration-150 hover:bg-rose-50 active:scale-[0.96]" type="submit">
@@ -293,10 +303,10 @@
                 syncBar();
 
                 bulkForm.addEventListener('submit', (event) => {
-                    event.preventDefault();
                     const ids = selected().map((cb) => cb.value);
 
                     if (ids.length === 0) {
+                        event.preventDefault();
                         return;
                     }
 
@@ -310,7 +320,6 @@
                         bulkForm.append(input);
                     });
 
-                    bulkForm.submit();
                 });
             })();
         </script>

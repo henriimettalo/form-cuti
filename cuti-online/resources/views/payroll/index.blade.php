@@ -7,15 +7,26 @@
         <div>
             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Payroll</p>
             <h1 class="page-title mt-2">Payroll bulanan</h1>
-            <p class="page-description">Simpan gaji, tunjangan, potongan, dan hasil transfer per periode tanpa mengubah data master pegawai.</p>
+            <p class="page-description">Perbarui data pegawai dari file payroll bulanan. Nomor rekening ikut disimpan jika tersedia. Nominal payroll diabaikan.</p>
         </div>
-        <a class="btn-primary shrink-0" href="{{ route('payroll.import.create') }}">Impor payroll</a>
+        <a class="btn-primary shrink-0" href="{{ route('payroll.import.create') }}">Impor data pegawai</a>
     </div>
+
+    <section class="card mt-7">
+        <h2 class="section-heading">Riwayat impor data pegawai</h2>
+        @forelse ($employeeImports as $employeeImport)
+            <a class="mt-4 block border-t border-slate-100 pt-4 text-sm text-sky-800" href="{{ route('payroll.import.preview', $employeeImport) }}">
+                {{ sprintf('%02d/%d', $employeeImport->month, $employeeImport->year) }} · {{ $employeeImport->original_filename }} · {{ $employeeImport->imported_rows }} pegawai
+            </a>
+        @empty
+            <p class="section-description">Belum ada impor data pegawai dari payroll yang selesai.</p>
+        @endforelse
+    </section>
 
     <section class="card mt-7">
         <div class="flex items-center justify-between gap-4">
             <div>
-                <h2 class="section-heading">Periode payroll</h2>
+                <h2 class="section-heading">Arsip payroll sebelumnya</h2>
                 <p class="section-description">Draf dapat diperiksa sebelum dikunci sebagai arsip resmi.</p>
             </div>
         </div>
@@ -23,7 +34,7 @@
         @if ($periods->isEmpty())
             <div class="card-inner mt-5 text-center">
                 <p class="text-sm font-medium text-slate-700">Belum ada payroll bulanan.</p>
-                <p class="mt-1 text-sm text-slate-500">Impor file gaji pertama untuk membuat periode payroll.</p>
+                <p class="mt-1 text-sm text-slate-500">Impor data pegawai tidak membuat periode gaji.</p>
             </div>
         @else
             <div class="mt-5 overflow-x-auto">

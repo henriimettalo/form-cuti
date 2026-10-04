@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>@yield('title', 'SIMPEG') · Sistem Kepegawaian</title>
         <script>
-            if (window.self !== window.top) {
+            if (window.frameElement?.hasAttribute('data-workspace-frame')) {
                 document.documentElement.dataset.workspaceFrame = 'true';
             }
         </script>
@@ -112,11 +112,12 @@
                 </div>
             </aside>
 
-            <main class="min-w-0 px-4 py-6 sm:px-6 lg:px-10 lg:py-9" data-workspace-root data-workspace-dashboard-url="{{ route('dashboard') }}">
+            <main class="min-w-0 px-4 py-3 sm:px-6 sm:py-6 lg:px-10 lg:py-9" data-workspace-root data-workspace-dashboard-url="{{ route('dashboard') }}">
                 <div class="mx-auto max-w-6xl">
                     <div class="navigation-toolbar" data-navigation-toolbar>
-                        <button class="sidebar-control" type="button" aria-controls="app-sidebar" aria-expanded="true" data-sidebar-toggle>
-                            <svg aria-hidden="true" class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                        <button class="sidebar-control sidebar-toggle" type="button" aria-controls="app-sidebar" aria-expanded="true" data-sidebar-toggle>
+                            <svg aria-hidden="true" class="sidebar-menu-icon size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                            <svg aria-hidden="true" class="sidebar-arrow-icon size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m14 6-6 6 6 6" /></svg>
                             <span data-sidebar-toggle-label>Menu</span>
                         </button>
                         <span class="text-sm font-semibold text-slate-700 md:hidden">SIMPEG</span>
@@ -164,8 +165,8 @@
 
                         @if ($errorMessages !== [])
                             <div class="mb-6 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-800 shadow-[inset_0_0_0_1px_rgba(225,29,72,0.14)]">
-                                <p class="font-semibold">Periksa kembali data yang diisi.</p>
-                                <ul class="mt-1 list-inside list-disc text-rose-700">
+                                <p class="font-semibold">Ditemukan {{ count($errorMessages) }} error. Periksa kembali data yang diisi.</p>
+                                <ul class="mt-2 list-outside list-disc space-y-2 pl-5 text-rose-700">
                                     @foreach ($errorMessages as $error)
                                         <li>{{ $error }}</li>
                                     @endforeach

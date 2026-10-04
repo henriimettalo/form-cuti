@@ -31,7 +31,7 @@
         <div class="md:col-span-2">
             <label class="form-label" for="position_title">Jabatan</label>
             <input class="form-input" id="position_title" name="position_title" value="{{ old('position_title', $employee?->position?->name ?? $employee?->position_title) }}" maxlength="255" placeholder="Contoh: Sekretaris Camat Pontianak Selatan">
-            <p class="form-help">Isi nama jabatan spesifik. Tipe jabatan (Fungsional Umum/Struktural) dari impor payroll.</p>
+            <p class="form-help">Isi nama jabatan spesifik. Tipe jabatan: Struktural, Fungsional, atau Fungsional Umum.</p>
             @error('position_title') <p class="form-error">{{ $message }}</p> @enderror
         </div>
         <div>
@@ -100,8 +100,9 @@
             <label class="form-label" for="position_type">Tipe jabatan</label>
             <select class="form-select" id="position_type" name="position_type">
                 <option value="">Pilih</option>
-                <option value="1" @selected((string) old('position_type', $employee?->position_type) === '1')>1 · Struktural</option>
-                <option value="3" @selected((string) old('position_type', $employee?->position_type) === '3')>3 · Fungsional Umum</option>
+                @foreach (\App\Models\Employee::POSITION_TYPES as $type => $label)
+                    <option value="{{ $type }}" @selected((string) old('position_type', $employee?->position_type) === (string) $type)>{{ $type }} · {{ $label }}</option>
+                @endforeach
             </select>
             @error('position_type') <p class="form-error">{{ $message }}</p> @enderror
         </div>

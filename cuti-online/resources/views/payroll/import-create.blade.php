@@ -6,16 +6,16 @@
     <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Payroll</p>
-            <h1 class="page-title mt-2">Impor payroll bulanan</h1>
-            <p class="page-description">Unggah file payroll, tinjau perubahan data pegawai, lalu konfirmasi sebelum periode disimpan.</p>
+            <h1 class="page-title mt-2">Impor data pegawai dari payroll</h1>
+            <p class="page-description">Gunakan file payroll bulanan untuk memperbarui data pegawai. Nomor rekening ikut diimpor. Nominal gaji, tunjangan, potongan, dan transfer diabaikan.</p>
         </div>
-        <a class="btn-secondary shrink-0" href="{{ route('payroll.index') }}">Kembali</a>
+        <a class="btn-secondary shrink-0" href="{{ route('payroll.index') }}">Kembali ke payroll</a>
     </div>
 
     @if ($pendingImports->isNotEmpty())
         <section class="card mt-7 border-amber-200 bg-amber-50/70">
             <h2 class="section-heading">Pratinjau menunggu konfirmasi</h2>
-            <p class="section-description">Selesaikan atau batalkan pratinjau ini sebelum mengunggah file lain untuk periode yang sama.</p>
+            <p class="section-description">Buka untuk memeriksa perubahan. Pratinjau dari alur lama perlu dibuat ulang dengan mengunggah file yang sama.</p>
             <div class="mt-4 space-y-2">
                 @foreach ($pendingImports as $pendingImport)
                     <a class="flex flex-col gap-1 rounded-xl bg-white px-4 py-3 text-sm shadow-[inset_0_0_0_1px_rgba(180,83,9,0.12)] transition-colors hover:bg-amber-100/60 sm:flex-row sm:items-center sm:justify-between" href="{{ route('payroll.import.preview', $pendingImport) }}">
@@ -45,34 +45,32 @@
             <div class="md:col-span-2">
                 <label class="form-label" for="source_type">Jenis file</label>
                 <select class="form-select" id="source_type" name="source_type" required>
-                    <option value="primary" @selected(old('source_type', 'primary') === 'primary')>Payroll gaji utama</option>
-                    <option value="tpp" @selected(old('source_type') === 'tpp')>Pelengkap TPP SIPD</option>
+                    <option value="primary" @selected(old('source_type', 'primary') === 'primary')>File payroll gaji</option>
+                    <option value="tpp" @selected(old('source_type') === 'tpp')>File TPP SIPD</option>
                 </select>
-                <p class="form-help">Pilih <strong>Payroll gaji utama</strong> untuk membuat periode. File TPP diimpor setelahnya sebagai pelengkap pada periode yang sama.</p>
+                <p class="form-help">Pilih jenis file sumber. Kedua jenis file hanya digunakan untuk memperbarui data pegawai.</p>
             </div>
             <div class="md:col-span-2">
                 <label class="form-label" for="file">File sumber<span class="required-asterisk text-rose-500" aria-hidden="true"> *</span></label>
                 <input class="form-input" id="file" name="file" type="file" accept=".xlsx,.csv,.txt" required>
-                <p class="form-help">Payroll utama memakai header seperti <code>nip_pegawai</code>, <code>gaji_pokok</code>, dan <code>jumlah_ditransfer</code>. TPP SIPD memakai header seperti <code>TPP Beban Kerja</code>, <code>Jumlah TPP</code>, dan <code>Jumlah Ditransfer</code>. Maksimal 1.000 baris.</p>
+                <p class="form-help">Kolom wajib: <code>nip_pegawai</code>, <code>nama_pegawai</code>, <code>status_asn</code>, dan <code>golongan</code>. Kolom nominal tidak diperlukan. Maksimal 1.000 baris.</p>
             </div>
         </div>
 
         <div class="card-inner mt-7 text-sm leading-6 text-slate-600">
             <p class="font-semibold text-slate-800">Yang dilakukan saat impor</p>
             <ul class="mt-2 list-inside list-disc">
-                <li>NIP wajib sudah terdaftar di menu Pegawai; jika ada NIP yang belum terdaftar, seluruh import dibatalkan.</li>
-                <li>Rekening disimpan terpisah dari data pegawai.</li>
-                <li>Payroll gaji menjadi data utama; TPP hanya melengkapi periode dan tidak menimpa nilai gaji.</li>
-                <li>Payroll disimpan sebagai snapshot periode yang dipilih.</li>
-                <li>Periode yang sudah memiliki data tidak dapat diimpor ulang sebelum ditolak.</li>
-                <li>Total dihitung ulang server dan dibandingkan dengan total file sumber.</li>
-                <li>Data sensitif tidak ditampilkan di daftar umum.</li>
+                <li>NIP wajib sudah terdaftar di menu Pegawai; jika ada NIP yang belum terdaftar, seluruh impor dibatalkan.</li>
+                <li>Perubahan identitas, pangkat, jabatan, dan masa kerja ditampilkan sebelum disimpan.</li>
+                <li>Nomor rekening ikut disimpan jika tersedia. Gaji, tunjangan, potongan, dan transfer tidak diambil.</li>
+                <li>Tahun dan bulan digunakan sebagai keterangan sumber perubahan.</li>
+                <li>Perubahan data pegawai dicatat di Log perubahan.</li>
             </ul>
         </div>
 
         <div class="mt-7 flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
             <a class="btn-secondary" href="{{ route('payroll.index') }}">Batal</a>
-            <button class="btn-primary" type="submit">Tinjau import</button>
+            <button class="btn-primary" type="submit">Tinjau impor</button>
         </div>
     </form>
 @endsection

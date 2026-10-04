@@ -11,6 +11,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
 class EmployeeController extends Controller
@@ -18,6 +19,7 @@ class EmployeeController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $data = $request->validate([
+            'view' => ['nullable', Rule::in(['full', 'imported'])],
             'search' => ['nullable', 'string', 'max:100'],
             'nip' => ['nullable', 'string', 'max:32'],
             'active' => ['nullable', 'boolean'],
@@ -55,6 +57,7 @@ class EmployeeController extends Controller
 
     public function show(Employee $employee): EmployeeResource
     {
+        request()->validate(['view' => ['nullable', Rule::in(['full', 'imported'])]]);
         $relations = [
             'department',
             'position',

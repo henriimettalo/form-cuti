@@ -104,14 +104,12 @@ class EmployeeController extends Controller
             'department',
             'position',
             'rankHistories' => fn ($query) => $query->latest('effective_on')->latest('id'),
-            'salaryHistories' => fn ($query) => $query->with('rankHistory')->latest('effective_on')->latest('id'),
             'positionHistories' => fn ($query) => $query->latest('effective_on')->latest('id'),
             'bankAccounts' => fn ($query) => $query->orderByDesc('is_primary')->orderBy('id'),
-            'payrollRecords' => fn ($query) => $query->with('payrollPeriod')->latest('created_at')->limit(6),
         ]);
 
-        $currentDepartmentName = $employee->positionHistories->firstWhere('department_name')?->department_name
-            ?? $employee->department?->name;
+        $currentDepartmentName = $employee->department?->name
+            ?? $employee->positionHistories->firstWhere('department_name')?->department_name;
         $canViewSensitive = $request->user()?->canViewSensitiveSimpegData() ?? false;
 
         return view('employees.show', compact('employee', 'currentDepartmentName', 'canViewSensitive'));
@@ -124,8 +122,8 @@ class EmployeeController extends Controller
             'position',
             'positionHistories' => fn ($query) => $query->latest('effective_on')->latest('id'),
         ]);
-        $currentDepartmentName = $employee->positionHistories->firstWhere('department_name')?->department_name
-            ?? $employee->department?->name;
+        $currentDepartmentName = $employee->department?->name
+            ?? $employee->positionHistories->firstWhere('department_name')?->department_name;
 
         return view('employees.edit', [
             'employee' => $employee,
@@ -244,7 +242,7 @@ class EmployeeController extends Controller
             'npwp' => ['nullable', 'digits_between:15,16'],
             'full_name' => ['required', 'string', 'max:255'],
             'position_title' => ['nullable', 'string', 'max:255'],
-            'position_type' => ['nullable', 'integer', Rule::in([1, 3])],
+            'position_type' => ['nullable', 'integer', Rule::in(array_keys(Employee::POSITION_TYPES))],
             'eselon' => ['nullable', 'string', 'max:8', 'regex:/^[0-9A-Za-z\/-]+$/'],
             'rank_grade' => [
                 'nullable',

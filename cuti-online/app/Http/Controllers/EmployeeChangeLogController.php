@@ -105,7 +105,7 @@ class EmployeeChangeLogController extends Controller
         }
 
         return match ($field) {
-            'position_type' => [1 => 'Struktural', 3 => 'Fungsional Umum'][$value] ?? (string) $value,
+            'position_type' => Employee::POSITION_TYPES[$value] ?? (string) $value,
             'marital_status' => [1 => 'Menikah', 2 => 'Belum menikah'][$value] ?? (string) $value,
             'spouse_is_pns' => (bool) $value ? 'Ya' : 'Tidak',
             default => (string) $value,

@@ -112,8 +112,8 @@ class EmployeeCareerHistoryTest extends TestCase
         $this->actingAs($operator)->get(route('employees.show', $employee))
             ->assertOk()
             ->assertSee('Riwayat pangkat dan golongan')
-            ->assertSee('Riwayat gaji pokok')
-            ->assertSee('Rp 4.346.200')
+            ->assertDontSee('Riwayat gaji pokok')
+            ->assertDontSee('Rp 4.346.200')
             ->assertSee('Riwayat jabatan');
     }
 

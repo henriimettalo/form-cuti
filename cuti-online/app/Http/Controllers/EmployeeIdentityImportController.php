@@ -6,7 +6,7 @@ use App\Services\EmployeeIdentityImportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Session\Store as SessionStore;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -14,6 +14,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class EmployeeIdentityImportController extends Controller
 {
     private const SESSION_KEY = 'identity-import-preview';
+
     private const PATH_KEY = 'identity-import-path';
 
     public function __construct(private readonly EmployeeIdentityImportService $imports) {}
@@ -61,7 +62,7 @@ class EmployeeIdentityImportController extends Controller
         return to_route('employees.identity-import.create');
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|View
     {
         $path = $request->session()->get(self::PATH_KEY);
         $preview = $request->session()->get(self::SESSION_KEY);
@@ -71,19 +72,22 @@ class EmployeeIdentityImportController extends Controller
                 ->withErrors(['file' => 'Pratinjau kedaluwarsa. Unggah file ulang.']);
         }
 
-        $fullPath = storage_path('app/private/'.$path);
+        $disk = Storage::disk('local');
+        $fullPath = $disk->path($path);
 
         if (! file_exists($fullPath)) {
             return to_route('employees.identity-import.create')
                 ->withErrors(['file' => 'File tidak tersedia. Unggah ulang.']);
         }
 
-        $this->imports->storeByPath($fullPath);
+        $count = $this->imports->storeByPath($fullPath);
 
         $request->session()->forget([self::SESSION_KEY, self::PATH_KEY]);
-        @unlink($fullPath);
+        $disk->delete($path);
 
-        $count = ($preview['total_rows'] ?? 0) - count($preview['errors'] ?? []) - count($preview['skipped_existing'] ?? []);
+        if ($request->boolean('modal')) {
+            return view('employees.identity-import-complete', ['count' => $count]);
+        }
 
         return to_route('employees.index')
             ->with('status', "{$count} data identitas pegawai berhasil diimpor.");

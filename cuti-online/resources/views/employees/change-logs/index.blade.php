@@ -3,30 +3,30 @@
 @section('title', 'Log Perubahan Pegawai')
 
 @section('content')
-    <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-5">
         <div>
             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Master data</p>
             <h1 class="page-title mt-2">Log perubahan pegawai</h1>
-            <p class="page-description">Catatan perubahan data master yang disetujui melalui import payroll.</p>
+            <p class="page-description">Catatan perubahan data master yang disetujui melalui impor payroll.</p>
         </div>
         <a class="btn-secondary shrink-0" href="{{ route('employees.index') }}">Kembali ke pegawai</a>
     </div>
 
-    <form class="card mt-7" method="GET" action="{{ route('employees.change-logs.index') }}">
-        <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_12rem_12rem_auto] md:items-end">
-            <div>
+    <form class="card mt-4 sm:mt-7" method="GET" action="{{ route('employees.change-logs.index') }}">
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-[minmax(0,1fr)_12rem_12rem_auto] md:items-end md:gap-4">
+            <div class="col-span-2 md:col-span-1">
                 <label class="form-label" for="search">Cari pegawai</label>
-                <input class="form-input" id="search" name="search" value="{{ $search }}" placeholder="NIP atau nama">
+                <input class="form-input" id="search" name="search" type="search" value="{{ $search }}" placeholder="NIP atau nama">
             </div>
-            <div>
+            <div class="min-w-0">
                 <label class="form-label" for="from">Dari tanggal</label>
                 <input class="form-input" id="from" name="from" type="date" value="{{ $from }}">
             </div>
-            <div>
+            <div class="min-w-0">
                 <label class="form-label" for="to">Sampai tanggal</label>
                 <input class="form-input" id="to" name="to" type="date" value="{{ $to }}">
             </div>
-            <button class="btn-primary" type="submit">Terapkan</button>
+            <button class="btn-primary col-span-2 md:col-span-1" type="submit">Terapkan</button>
         </div>
     </form>
 
@@ -45,7 +45,7 @@
                     <a class="btn-secondary mt-4 inline-flex" href="{{ route('employees.change-logs.index') }}">Hapus filter</a>
                 @else
                     <p class="font-semibold text-slate-800">Belum ada log perubahan.</p>
-                    <p class="mt-1">Log akan muncul setelah ada perubahan data pegawai yang dikonfirmasi melalui import payroll.</p>
+                    <p class="mt-1">Log akan muncul setelah ada perubahan data pegawai yang dikonfirmasi melalui impor payroll.</p>
                 @endif
             </div>
         @else

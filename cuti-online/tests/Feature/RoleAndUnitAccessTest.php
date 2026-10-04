@@ -48,7 +48,7 @@ class RoleAndUnitAccessTest extends TestCase
             ->assertOk()
             ->assertSee('Admin Sekretariat')
             ->assertSee('Sekretariat Kecamatan Pontianak Selatan')
-            ->assertSee('Manage Admin')
+            ->assertSee('Kelola admin')
             ->assertSee('Administrasi Unit')
             ->assertSee('Seluruh Akun');
     }

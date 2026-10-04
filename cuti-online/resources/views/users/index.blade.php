@@ -34,7 +34,7 @@
 
         <nav class="mt-7" data-account-tabs data-account-tab-default="{{ $defaultAccountTab }}" role="tablist" aria-label="Administrasi akun dan unit">
             <div class="flex flex-wrap gap-1 rounded-2xl bg-slate-100 p-1">
-                <button class="account-tab account-tab-active" id="account-tab-super-admin" type="button" role="tab" aria-selected="true" aria-controls="account-panel-super-admin" data-account-tab="super-admin">Manage Admin</button>
+                <button class="account-tab account-tab-active" id="account-tab-super-admin" type="button" role="tab" aria-selected="true" aria-controls="account-panel-super-admin" data-account-tab="super-admin">Kelola admin</button>
                 <button class="account-tab" id="account-tab-units" type="button" role="tab" aria-selected="false" aria-controls="account-panel-units" data-account-tab="units" tabindex="-1">Administrasi Unit</button>
                 <button class="account-tab" id="account-tab-accounts" type="button" role="tab" aria-selected="false" aria-controls="account-panel-accounts" data-account-tab="accounts" tabindex="-1">Seluruh Akun</button>
             </div>

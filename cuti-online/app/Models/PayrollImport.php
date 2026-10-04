@@ -25,6 +25,7 @@ class PayrollImport extends Model
         'year',
         'month',
         'source_type',
+        'employee_data_only',
         'original_filename',
         'source_checksum',
         'total_rows',
@@ -40,6 +41,7 @@ class PayrollImport extends Model
     protected function casts(): array
     {
         return [
+            'employee_data_only' => 'boolean',
             'payload' => 'array',
             'master_changes' => 'array',
             'processed_at' => 'datetime',
@@ -48,6 +50,10 @@ class PayrollImport extends Model
 
     public function sourceTypeLabel(): string
     {
+        if ($this->employee_data_only) {
+            return $this->isTpp() ? 'File TPP SIPD' : 'File payroll gaji';
+        }
+
         return match ($this->source_type) {
             self::SOURCE_TPP => 'Pelengkap TPP SIPD',
             default => 'Payroll gaji utama',

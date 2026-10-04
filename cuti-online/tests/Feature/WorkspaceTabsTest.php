@@ -23,7 +23,7 @@ class WorkspaceTabsTest extends TestCase
             ->assertSee('data-workspace-panels', false)
             ->assertSee('data-workspace-link', false)
             ->assertSee('data-workspace-title="Pegawai"', false)
-            ->assertSee('data-workspace-title="Buat Formulir"', false)
+            ->assertSee('data-workspace-title="Buat Formulir Cuti"', false)
             ->assertSee('data-workspace-dashboard-url', false)
             ->assertDontSee('data-workspace-tab-close data-workspace-tab-id="initial"', false);
     }

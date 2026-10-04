@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\Employee;
 use App\Support\EmployeeNipMetadata;
 use App\Support\EmployeeRankOptions;
 use Illuminate\Foundation\Http\FormRequest;
@@ -42,7 +43,7 @@ class StoreEmployeeRequest extends FormRequest
             'npwp' => ['nullable', 'digits_between:15,16'],
             'full_name' => ['required', 'string', 'max:255'],
             'position_title' => ['required', 'string', 'max:255'],
-            'position_type' => ['nullable', 'integer', Rule::in([1, 3])],
+            'position_type' => ['nullable', 'integer', Rule::in(array_keys(Employee::POSITION_TYPES))],
             'eselon' => ['nullable', 'string', 'max:8', 'regex:/^[0-9A-Za-z\/-]+$/'],
             'rank_grade' => [
                 'nullable',

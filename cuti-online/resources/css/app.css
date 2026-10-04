@@ -20,6 +20,39 @@
 }
 
 @layer components {
+    .import-confirmation {
+        @apply m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border-0 bg-white p-5 text-slate-900 shadow-xl sm:p-6;
+        max-height: calc(100dvh - 2rem);
+        overflow-y: auto;
+    }
+
+    .import-confirmation::backdrop {
+        background: rgb(15 23 42 / 45%);
+    }
+    .import-modal {
+        @apply m-auto w-[calc(100%-1.5rem)] max-w-4xl rounded-2xl border-0 bg-slate-50 p-0 text-slate-900 shadow-xl;
+        height: min(52rem, calc(100dvh - 1.5rem));
+    }
+
+    .import-modal[open] {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .import-modal::backdrop {
+        background: rgb(15 23 42 / 45%);
+    }
+
+    .import-modal-header {
+        @apply flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2;
+    }
+
+    .import-modal-frame {
+        flex: 1;
+        min-height: 0;
+        width: 100%;
+        border: 0;
+    }
     .app-shell {
         @apply min-h-screen bg-[radial-gradient(circle_at_top_left,_#dbeafe_0,_transparent_27%),linear-gradient(180deg,_#f8fafc_0%,_#f1f5f9_100%)];
     }
@@ -38,7 +71,8 @@
     }
 
     .navigation-toolbar,
-    .sidebar-close {
+    .sidebar-close,
+    .sidebar-arrow-icon {
         display: none;
     }
 
@@ -77,6 +111,46 @@
     }
 
     @media (width >= 48rem) {
+        [data-navigation-ready] .navigation-toolbar {
+            display: block;
+            margin-bottom: 0;
+        }
+
+        .sidebar-toggle {
+            position: fixed;
+            top: 1.5rem;
+            left: calc(15rem - 1.375rem);
+            z-index: 30;
+            width: 2.75rem;
+            padding: 0;
+            border: 1px solid var(--color-slate-200);
+            background: white;
+        }
+
+        .sidebar-toggle [data-sidebar-toggle-label] {
+            @apply sr-only;
+        }
+
+        .sidebar-menu-icon {
+            display: none;
+        }
+
+        .sidebar-arrow-icon {
+            display: block;
+        }
+
+        [data-sidebar-collapsed] .sidebar-toggle {
+            left: 0.25rem;
+        }
+
+        [data-sidebar-collapsed] .sidebar-arrow-icon {
+            transform: rotate(180deg);
+        }
+
+        [data-sidebar-collapsed] > main {
+            padding-left: 4rem !important;
+        }
+
         .app-shell {
             display: grid;
             grid-template-columns: 15rem minmax(0, 1fr);
@@ -110,7 +184,27 @@
     }
 
     .workspace-tabs {
-        @apply mb-6 overflow-hidden rounded-2xl bg-white p-1 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_20px_rgba(15,23,42,0.05)];
+        @apply mb-4 overflow-hidden rounded-2xl bg-white p-1 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_20px_rgba(15,23,42,0.05)] sm:mb-6;
+    }
+
+    .sticky-page-title {
+        @apply fixed top-0 z-20 flex h-12 items-center border-b border-slate-200 bg-slate-50 px-3 text-base font-semibold text-slate-950 sm:text-lg;
+    }
+
+    .sticky-page-title[hidden] {
+        display: none;
+    }
+
+    .employee-list-tabs {
+        @apply flex gap-2 border-b border-slate-200;
+    }
+
+    .employee-list-tab {
+        @apply inline-flex min-h-11 items-center justify-center border-b-2 border-transparent px-3 py-2 text-sm font-medium text-slate-600 hover:border-slate-300 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 sm:px-4;
+    }
+
+    .employee-list-tab-active {
+        @apply border-sky-600 font-semibold text-sky-800 hover:border-sky-600 hover:text-sky-800;
     }
 
     .workspace-tablist {
@@ -143,11 +237,31 @@
     }
 
     .card {
-        @apply rounded-2xl bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_rgba(15,23,42,0.06)];
+        @apply rounded-2xl bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_rgba(15,23,42,0.06)] sm:p-5;
     }
 
     .card-inner {
         @apply rounded-xl bg-slate-50 p-4;
+    }
+
+    .dashboard-summary .card {
+        @apply flex min-w-0 flex-col p-3 sm:p-5;
+    }
+
+    .dashboard-summary .card > p:first-child {
+        @apply text-xs leading-5 sm:text-sm;
+    }
+
+    .dashboard-summary .card > p:nth-child(2) {
+        @apply mt-1 text-2xl sm:mt-2 sm:text-3xl;
+    }
+
+    .dashboard-summary .card > a {
+        @apply mt-auto min-h-11 items-center text-xs sm:mt-4 sm:text-sm;
+    }
+
+    .dashboard-summary .card > p:last-child:not(:nth-child(2)) {
+        @apply mt-2 text-xs leading-5 sm:mt-4 sm:text-sm;
     }
 
     .unit-source-option {
@@ -159,11 +273,11 @@
     }
 
     .page-title {
-        @apply text-2xl font-semibold tracking-[-0.02em] text-slate-950 [text-wrap:balance];
+        @apply text-xl font-semibold tracking-[-0.02em] text-slate-950 [text-wrap:balance] sm:text-2xl;
     }
 
     .page-description {
-        @apply mt-1 max-w-2xl text-sm leading-6 text-slate-500 [text-wrap:pretty];
+        @apply mt-1 max-w-2xl text-sm leading-5 text-slate-500 [text-wrap:pretty] sm:leading-6;
     }
 
     .section-heading {
@@ -263,63 +377,8 @@
         @apply min-h-28 w-full rounded-xl border-0 bg-slate-100 px-3.5 py-3 text-sm text-slate-900 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] outline-none transition-shadow duration-150 placeholder:text-slate-400 focus:bg-white focus:shadow-[inset_0_0_0_2px_rgba(14,165,233,0.6)];
     }
 
-    .form-field-floating {
-        @apply relative;
-    }
-
-    .form-field-floating .form-label {
-        @apply pointer-events-none absolute left-3.5 top-7 z-10 mb-0 max-w-[calc(100%-6.5rem)] -translate-y-1/2 text-sm font-medium leading-5 text-slate-500;
-        transition-property: top, transform, color, font-size, line-height;
-        transition-duration: 150ms;
-        transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
-    }
-
-    .form-field-floating .form-input {
-        @apply min-h-14 px-3.5 pb-2 pt-5;
-    }
-
-    .form-field-floating.has-counter .form-input {
-        @apply pr-[4.75rem];
-    }
-
-    .form-field-floating .form-textarea {
-        @apply min-h-32 px-3.5 pb-3 pt-7;
-    }
-
-    .form-field-floating.has-counter .form-textarea {
-        @apply pr-[4.75rem];
-    }
-
-    .form-field-floating .form-input::placeholder,
-    .form-field-floating .form-textarea::placeholder {
-        @apply text-transparent;
-        transition-property: color;
-        transition-duration: 150ms;
-        transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
-    }
-
-    .form-field-floating:focus-within .form-input::placeholder,
-    .form-field-floating:focus-within .form-textarea::placeholder {
-        @apply text-slate-400;
-    }
-
-    .form-field-floating:focus-within .form-label,
-    .form-field-floating.is-filled .form-label,
-    .form-field-floating.is-textarea .form-label,
-    .form-field-floating:has(.form-input:not(:placeholder-shown)) .form-label,
-    .form-field-floating:has(.form-textarea:not(:placeholder-shown)) .form-label {
-        @apply top-2 translate-y-0 text-[0.6875rem] leading-4 text-sky-700;
-    }
-
     .form-field-counter {
-        @apply pointer-events-none absolute right-3.5 top-2 z-10 text-xs tabular-nums text-slate-400;
-        transition-property: color;
-        transition-duration: 150ms;
-        transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
-    }
-
-    .form-field-floating:focus-within .form-field-counter {
-        @apply text-sky-700;
+        @apply mt-1 block text-right text-xs tabular-nums text-slate-500;
     }
 
     .form-help {

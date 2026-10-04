@@ -15,6 +15,12 @@ class Employee extends Model
     /** @use HasFactory<EmployeeFactory> */
     use HasFactory, SoftDeletes;
 
+    public const POSITION_TYPES = [
+        1 => 'Struktural',
+        2 => 'Fungsional',
+        3 => 'Fungsional Umum',
+    ];
+
     protected $fillable = [
         'user_id',
         'department_id',
@@ -44,6 +50,7 @@ class Employee extends Model
         'email',
         'address',
         'is_active',
+        'imported_api_fields',
     ];
 
     protected function casts(): array
@@ -60,6 +67,7 @@ class Employee extends Model
             'grade_service_years' => 'integer',
             'grade_service_months' => 'integer',
             'is_active' => 'boolean',
+            'imported_api_fields' => 'array',
         ];
     }
 

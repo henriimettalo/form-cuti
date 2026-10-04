@@ -15,6 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use InvalidArgumentException;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use Tests\TestCase;
 
 class PayrollImportTest extends TestCase
@@ -86,9 +87,9 @@ class PayrollImportTest extends TestCase
             ->get(route('employees.show', $employee))
             ->assertOk()
             ->assertSee('Administrasi kepegawaian')
-            ->assertSee('Payroll terbaru')
+            ->assertDontSee('Payroll terbaru')
             ->assertSee('6171052401900001')
-            ->assertSee('Rp 1.209.928');
+            ->assertDontSee('Rp 1.209.928');
 
         $this->actingAs(User::factory()->create(['role' => 'operator']))
             ->get(route('employees.show', $employee))
@@ -146,6 +147,48 @@ class PayrollImportTest extends TestCase
         $this->assertDatabaseCount('employee_payrolls', 0);
     }
 
+    public function test_preview_ignores_empty_excel_rows_with_zero_salary_formulas(): void
+    {
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $rows = array_map('str_getcsv', explode("\n", trim($this->csvContent())));
+        $sheet->fromArray($rows);
+        $sheet->setCellValue('U3', '=0');
+        $sheet->setCellValue('AS3', '=SUM(U3:AR3)');
+        $path = tempnam(sys_get_temp_dir(), 'payroll-empty-');
+
+        try {
+            IOFactory::createWriter($spreadsheet, 'Xlsx')->save($path);
+            $preview = app(PayrollImportService::class)->preview(
+                new UploadedFile($path, 'payroll.xlsx', null, null, true), 2026, 5,
+            );
+            $this->assertSame(1, $preview->total_rows);
+            $this->assertDatabaseCount('employee_payrolls', 0);
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+            unlink($path);
+        }
+    }
+
+    public function test_preview_rejects_unidentified_salary_and_preserves_original_row_numbers(): void
+    {
+        $lines = explode("\n", trim($this->csvContent()));
+        $orphan = array_fill(0, count(str_getcsv($lines[0])), '');
+        $orphan[20] = '1000000';
+        $content = implode("\n", [$lines[0], $lines[1], '', implode(',', $orphan)]);
+
+        try {
+            app(PayrollImportService::class)->preview(
+                UploadedFile::fake()->createWithContent('payroll.csv', $content), 2026, 5,
+            );
+            self::fail('Nominal gaji tanpa identitas harus ditolak.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertStringContainsString('Baris 4: NIP wajib diisi.', $exception->getMessage());
+        }
+        $this->assertDatabaseCount('payroll_imports', 0);
+        $this->assertDatabaseCount('employee_payrolls', 0);
+    }
+
     public function test_web_import_shows_unregistered_nip_row_error_to_the_user(): void
     {
         $operator = User::factory()->create();
@@ -190,13 +233,152 @@ class PayrollImportTest extends TestCase
 
         $preview = PayrollImport::query()->firstOrFail();
 
+        $this->assertTrue($preview->employee_data_only);
+        $this->assertArrayNotHasKey('basic_salary', $preview->payload[0]);
+        $this->assertArrayNotHasKey('source_transferred_amount', $preview->payload[0]);
+        $this->assertArrayNotHasKey('tpp_workload', $preview->payload[0]);
+        $this->assertSame('001234', $preview->payload[0]['account_number']);
+        $this->actingAs($operator)->get(route('payroll.import.preview', $preview))
+            ->assertOk()->assertDontSee('Gaji pokok')->assertDontSee('Ditransfer')
+            ->assertSee('Simpan data pegawai');
+
         $this->actingAs($operator)
             ->post(route('payroll.import.confirm', $preview))
             ->assertRedirect();
 
-        $this->assertDatabaseCount('payroll_periods', 1);
-        $this->assertDatabaseCount('employee_payrolls', 1);
+        $this->assertDatabaseCount('payroll_periods', 0);
+        $this->assertDatabaseCount('employee_payrolls', 0);
+        $this->assertDatabaseHas('employee_bank_accounts', ['account_number' => '001234', 'is_primary' => true]);
         $this->assertSame('Pegawai Payroll', Employee::query()->firstOrFail()->full_name);
+    }
+
+    public function test_web_import_displays_each_row_error_as_a_separate_list_item(): void
+    {
+        $operator = User::factory()->create();
+        $content = "nip_pegawai,nama_pegawai,status_asn,golongan\n199001012020011103,Pegawai A,1,III/a\n199001012020011104,Pegawai B,1,III/a";
+        $page = $this->followingRedirects()->from(route('payroll.import.create'))->actingAs($operator)
+            ->post(route('payroll.import.store'), [
+                'year' => 2026, 'month' => 5,
+                'file' => UploadedFile::fake()->createWithContent('belum-terdaftar.csv', $content),
+            ])->assertOk()->assertSee('Ditemukan 2 error.');
+        $page->assertSee('<li>Baris 2: NIP 199001012020011103 belum terdaftar di menu Pegawai. Tambahkan pegawai terlebih dahulu.</li>', false)
+            ->assertSee('<li>Baris 3: NIP 199001012020011104 belum terdaftar di menu Pegawai. Tambahkan pegawai terlebih dahulu.</li>', false);
+        $this->assertDatabaseCount('payroll_imports', 0);
+    }
+
+    public function test_web_employee_import_accepts_file_without_financial_columns(): void
+    {
+        $operator = User::factory()->create();
+        $content = "nip_pegawai,nama_pegawai,status_asn,golongan,nama_jabatan\n199001012020011102,Nama Baru,1,III/a,Jabatan Baru";
+        $this->actingAs($operator)->post(route('payroll.import.store'), [
+            'year' => 2026, 'month' => 5, 'source_type' => 'tpp',
+            'file' => UploadedFile::fake()->createWithContent('pegawai.csv', $content),
+        ])->assertSessionHasNoErrors()->assertRedirect();
+        $preview = PayrollImport::query()->firstOrFail();
+        $this->actingAs($operator)->post(route('payroll.import.confirm', $preview))
+            ->assertRedirect(route('employees.index'));
+        $this->assertSame('Nama Baru', Employee::query()->firstOrFail()->full_name);
+        $this->assertDatabaseCount('employee_payrolls', 0);
+        $this->assertDatabaseCount('employee_bank_accounts', 0);
+        $this->assertDatabaseCount('payroll_periods', 0);
+    }
+
+    public function test_employee_import_accepts_functional_position_type_two(): void
+    {
+        $operator = User::factory()->create();
+        $content = "nip_pegawai,nama_pegawai,status_asn,golongan,tipe_jabatan\n199001012020011102,Pegawai Fungsional,1,III/a,2";
+        $this->actingAs($operator)->post(route('payroll.import.store'), [
+            'year' => 2026, 'month' => 5,
+            'file' => UploadedFile::fake()->createWithContent('fungsional.csv', $content),
+        ])->assertSessionHasNoErrors()->assertRedirect();
+        $preview = PayrollImport::query()->firstOrFail();
+        $this->assertSame(2, $preview->payload[0]['position_type']);
+        $changes = $preview->master_changes['items'][0]['changes'];
+        $typeChange = collect($changes)->firstWhere('attribute', 'position_type');
+        $this->assertSame('Fungsional', $typeChange['new']);
+        $this->actingAs($operator)->post(route('payroll.import.confirm', $preview))
+            ->assertSessionHasNoErrors()->assertRedirect(route('employees.index'));
+        $employee = Employee::query()->firstOrFail();
+        $this->assertSame(2, $employee->position_type);
+        $this->actingAs($operator)->get(route('employees.show', $employee))
+            ->assertOk()->assertSee('Fungsional');
+        $this->actingAs($operator)->get(route('employees.edit', $employee))
+            ->assertOk()->assertSee('2 · Fungsional');
+        $this->actingAs($operator)->get(route('employees.change-logs.index'))
+            ->assertOk()->assertSee('Fungsional');
+    }
+
+    public function test_web_cannot_confirm_old_preview_containing_salary(): void
+    {
+        $preview = app(PayrollImportService::class)->preview(
+            UploadedFile::fake()->createWithContent('lama.csv', $this->csvContent()), 2026, 5,
+        );
+        $this->actingAs(User::factory()->create())->post(route('payroll.import.confirm', $preview))
+            ->assertSessionHasErrors('import');
+        $this->assertDatabaseCount('employee_payrolls', 0);
+        $this->assertSame('Pegawai Terdaftar', Employee::query()->firstOrFail()->full_name);
+    }
+
+    public function test_employee_only_preview_keeps_bank_but_discards_financial_values_including_footer(): void
+    {
+        $lines = explode("\n", trim($this->csvContent()));
+        $row = str_getcsv($lines[1]);
+        $row[19] = '000123456';
+        $row[20] = 'GAJI_TIDAK_DISIMPAN';
+        $footer = array_fill(0, count($row), '');
+        $footer[20] = '9000000';
+        $content = implode("\n", [$lines[0], implode(',', $row), implode(',', $footer)]);
+        $preview = app(PayrollImportService::class)->preview(
+            UploadedFile::fake()->createWithContent('pegawai.csv', $content), 2026, 5,
+            employeeDataOnly: true,
+        );
+        $this->assertSame(1, $preview->total_rows);
+        $this->assertStringNotContainsString('GAJI_TIDAK_DISIMPAN', json_encode($preview->payload));
+        $this->assertSame('000123456', $preview->payload[0]['account_number']);
+        $this->assertArrayNotHasKey('basic_salary', $preview->payload[0]);
+        app(PayrollImportService::class)->confirmEmployeeData($preview);
+        $this->assertDatabaseCount('employee_payrolls', 0);
+        $this->assertDatabaseHas('employee_bank_accounts', ['account_number' => '000123456']);
+        $this->assertDatabaseCount('payroll_periods', 0);
+        $audit = AuditLog::query()->latest('id')->firstOrFail();
+        $this->assertArrayNotHasKey('basic_salary', $audit->new_values);
+        $this->assertArrayHasKey('account_number', $audit->new_values);
+    }
+
+    public function test_employee_import_accepts_account_number_without_bank_metadata_and_keeps_it_when_omitted(): void
+    {
+        $operator = User::factory()->create();
+        $header = 'nip_pegawai,nama_pegawai,status_asn,golongan';
+        foreach ([
+            $header.",nomor_rekening\n199001012020011102,Pegawai Terdaftar,1,III/a,000987654",
+            $header."\n199001012020011102,Pegawai Terdaftar,1,III/a",
+        ] as $content) {
+            $this->actingAs($operator)->post(route('payroll.import.store'), [
+                'year' => 2026, 'month' => 5,
+                'file' => UploadedFile::fake()->createWithContent('rekening.csv', $content),
+            ])->assertSessionHasNoErrors()->assertRedirect();
+            $preview = PayrollImport::query()->latest('id')->firstOrFail();
+            $this->actingAs($operator)->post(route('payroll.import.confirm', $preview))
+                ->assertSessionHasNoErrors()->assertRedirect(route('employees.index'));
+            $this->assertDatabaseHas('employee_bank_accounts', ['account_number' => '000987654', 'is_primary' => true]);
+            $this->assertDatabaseCount('employee_bank_accounts', 1);
+        }
+        $this->assertDatabaseCount('employee_payrolls', 0);
+        $this->assertDatabaseCount('payroll_periods', 0);
+        $employee = Employee::query()->firstOrFail();
+        $this->actingAs($operator)->get(route('employees.show', $employee))
+            ->assertOk()->assertSee('000987654')->assertDontSee(' · 000987654');
+    }
+
+    public function test_employee_import_preserves_bank_metadata_when_only_the_same_account_number_is_provided(): void
+    {
+        $service = app(PayrollImportService::class);
+        foreach ([$this->csvContent(), "nip_pegawai,nama_pegawai,status_asn,golongan,nomor_rekening\n199001012020011102,Pegawai Payroll,1,III/a,001234"] as $content) {
+            $preview = $service->preview(UploadedFile::fake()->createWithContent('rekening.csv', $content), 2026, 5, employeeDataOnly: true);
+            $service->confirmEmployeeData($preview);
+        }
+        $this->assertDatabaseCount('employee_bank_accounts', 1);
+        $this->assertDatabaseHas('employee_bank_accounts', ['account_number' => '001234', 'bank_code' => '123', 'is_primary' => true]);
     }
 
     public function test_tpp_import_complements_primary_period_without_replacing_salary_data(): void
@@ -432,7 +614,7 @@ class PayrollImportTest extends TestCase
 
         $this->actingAs($operator)
             ->post(route('payroll.import.confirm', $preview))
-            ->assertRedirect(route('payroll.show', $period));
+            ->assertRedirect(route('employees.index'));
 
         $this->assertDatabaseHas('audit_logs', [
             'event' => 'employee.master_updated_from_payroll_import',

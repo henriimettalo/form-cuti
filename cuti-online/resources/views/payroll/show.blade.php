@@ -10,17 +10,17 @@
             <p class="page-description">{{ $period->source_file ?: 'Tanpa file sumber' }} · {{ number_format($period->imported_rows, 0, ',', '.') }} pegawai{{ $period->hasTpp() ? ' · TPP '.number_format($period->tpp_imported_rows, 0, ',', '.').' pegawai' : '' }}</p>
         </div>
         <div class="flex flex-wrap gap-3">
-            <a class="btn-secondary" href="{{ route('payroll.index') }}">Kembali</a>
+            <a class="btn-secondary" href="{{ route('payroll.index') }}">Kembali ke payroll</a>
             <a class="btn-secondary" href="{{ route('payroll.export', $period) }}">Export Excel BKAD</a>
             @if ($period->hasTpp())
                 <a class="btn-secondary" href="{{ route('payroll.export-tpp', $period) }}">Export TPP SIPD</a>
             @endif
             @if ($period->status === 'draft')
-                <form method="POST" action="{{ route('payroll.reject', $period) }}" onsubmit="return confirm('Tolak data payroll periode ini? Setelah ditolak, periode dapat diimpor ulang.')">
+                <form method="POST" action="{{ route('payroll.reject', $period) }}" data-confirm-title="Tolak periode payroll?" data-confirm-message="Setelah ditolak, periode dapat diimpor ulang." data-confirm-button="Tolak periode">
                     @csrf
                     <button class="btn-danger" type="submit">Tolak data</button>
                 </form>
-                <form method="POST" action="{{ route('payroll.lock', $period) }}" onsubmit="return confirm('Kunci periode payroll ini? Setelah dikunci, file tidak dapat diimpor ulang.')">
+                <form method="POST" action="{{ route('payroll.lock', $period) }}" data-confirm-title="Kunci periode payroll?" data-confirm-message="Setelah dikunci, file tidak dapat diimpor ulang." data-confirm-button="Kunci periode">
                     @csrf
                     <button class="btn-primary" type="submit">Kunci periode</button>
                 </form>

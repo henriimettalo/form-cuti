@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Buat Formulir')
+@section('title', 'Buat Formulir Cuti')
 
 @section('content')
     <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -9,7 +9,7 @@
             <h1 class="page-title mt-2">Buat formulir cuti</h1>
             <p class="page-description">Data disimpan sebagai arsip, kemudian otomatis dibuatkan dokumen Word.</p>
         </div>
-        <a class="btn-secondary shrink-0" href="{{ route('leave-requests.index') }}">Kembali</a>
+        <a class="btn-secondary shrink-0" href="{{ route('leave-requests.index') }}">Kembali ke formulir cuti</a>
     </div>
 
     @if ($employees->isEmpty())

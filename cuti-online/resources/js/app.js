@@ -1,4 +1,261 @@
-const isWorkspaceFrame = window.self !== window.top;
+const isWorkspaceFrame = document.documentElement.dataset.workspaceFrame === 'true';
+const isImportModalFrame = window.frameElement?.hasAttribute('data-import-modal-frame') === true;
+
+if (!isWorkspaceFrame) {
+    const stickyTitle = document.createElement('div');
+    stickyTitle.className = 'sticky-page-title';
+    stickyTitle.hidden = true;
+    stickyTitle.setAttribute('aria-hidden', 'true');
+    document.body.append(stickyTitle);
+    let titleUpdatePending = false;
+    const observedFrameDocuments = new WeakSet();
+
+    const updateStickyTitle = () => {
+        titleUpdatePending = false;
+        const panels = document.querySelector('[data-workspace-root]');
+        const panel = panels
+            ? Array.from(panels.querySelectorAll('[data-workspace-panel]')).find((element) => !element.hidden)
+            : document.querySelector('main');
+        const frame = panel?.querySelector('iframe[data-workspace-frame]');
+        let title;
+        try {
+            title = (frame ? frame.contentDocument : panel)?.querySelector('[data-sticky-page-title]');
+            if (frame?.contentDocument && !observedFrameDocuments.has(frame.contentDocument)) {
+                observedFrameDocuments.add(frame.contentDocument);
+                frame.contentWindow.addEventListener('scroll', scheduleTitleUpdate, { passive: true });
+            }
+        } catch {
+            stickyTitle.hidden = true;
+            return;
+        }
+        if (!title || !panel.getClientRects().length) {
+            stickyTitle.hidden = true;
+            return;
+        }
+        const titleBounds = title.getBoundingClientRect();
+        const panelBounds = panel.getBoundingClientRect();
+        const frameBounds = frame?.getBoundingClientRect();
+        const titleBottom = titleBounds.bottom + (frameBounds?.top ?? 0);
+        const top = Math.max(0, frameBounds?.top ?? 0);
+        stickyTitle.hidden = titleBottom > top || panelBounds.bottom <= top + 48;
+        if (!stickyTitle.hidden) {
+            const left = Math.max(0, titleBounds.left + (frameBounds?.left ?? 0));
+            const right = Math.min(window.innerWidth, panelBounds.right);
+            stickyTitle.textContent = title.textContent.trim();
+            stickyTitle.style.top = `${top}px`;
+            stickyTitle.style.left = `${left}px`;
+            stickyTitle.style.width = `${Math.max(0, right - left)}px`;
+        }
+    };
+    const scheduleTitleUpdate = () => {
+        if (!titleUpdatePending) {
+            titleUpdatePending = true;
+            window.requestAnimationFrame(updateStickyTitle);
+        }
+    };
+    window.addEventListener('scroll', scheduleTitleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleTitleUpdate);
+    document.addEventListener('load', scheduleTitleUpdate, true);
+    const workspacePanels = document.querySelector('[data-workspace-root]');
+    if (workspacePanels) {
+        new MutationObserver(scheduleTitleUpdate).observe(workspacePanels, {
+            subtree: true, attributes: true, attributeFilter: ['hidden'], childList: true,
+        });
+    }
+    const shell = document.querySelector('.app-shell');
+    if (shell) {
+        new MutationObserver(scheduleTitleUpdate).observe(shell, {
+            attributes: true, attributeFilter: ['data-sidebar-collapsed'],
+        });
+    }
+    scheduleTitleUpdate();
+}
+
+if (document.querySelector('[data-confirm-title]')) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'import-confirmation';
+    dialog.setAttribute('aria-labelledby', 'action-confirmation-title');
+    dialog.setAttribute('aria-describedby', 'action-confirmation-description');
+    dialog.innerHTML = `
+        <h2 class="page-title" id="action-confirmation-title"></h2>
+        <p class="page-description mt-3" id="action-confirmation-description"></p>
+        <div class="mt-6 flex flex-wrap justify-end gap-3">
+            <button class="btn-secondary" type="button" data-action-confirmation-back>Kembali</button>
+            <button class="btn-primary" type="button" data-action-confirmation-submit></button>
+        </div>`;
+    document.body.append(dialog);
+    const backButton = dialog.querySelector('[data-action-confirmation-back]');
+    const confirmButton = dialog.querySelector('[data-action-confirmation-submit]');
+    let pendingForm = null;
+    let pendingSubmitter = null;
+    let approvedForm = null;
+
+    document.addEventListener('submit', (event) => {
+        const form = event.target;
+        if (event.defaultPrevented || form === approvedForm) return;
+        const source = event.submitter?.hasAttribute('data-confirm-title') ? event.submitter : form;
+        if (!source.hasAttribute('data-confirm-title')) return;
+        event.preventDefault();
+        pendingForm = form;
+        pendingSubmitter = event.submitter;
+        dialog.querySelector('#action-confirmation-title').textContent = source.dataset.confirmTitle;
+        dialog.querySelector('#action-confirmation-description').textContent = source.dataset.confirmMessage ?? '';
+        confirmButton.textContent = source.dataset.confirmButton ?? 'Lanjutkan';
+        dialog.showModal();
+        backButton.focus();
+    });
+    backButton.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') event.stopPropagation();
+    });
+    dialog.addEventListener('close', () => pendingSubmitter?.focus());
+    confirmButton.addEventListener('click', () => {
+        if (!pendingForm) return;
+        const form = pendingForm;
+        const submitter = pendingSubmitter;
+        pendingForm = null;
+        dialog.close();
+        approvedForm = form;
+        try {
+            form.requestSubmit(submitter ?? undefined);
+        } finally {
+            approvedForm = null;
+        }
+    });
+}
+
+const importConfirmation = document.querySelector('[data-import-confirmation]');
+const importForm = document.querySelector('[data-confirm-employee-import]');
+if (importConfirmation && importForm) {
+    const confirmButton = importConfirmation.querySelector('[data-import-confirmation-submit]');
+    let confirmed = false;
+    let submitter = null;
+    importForm.addEventListener('submit', (event) => {
+        if (confirmed) {
+            confirmButton.disabled = true;
+            confirmButton.textContent = 'Mengimpor…';
+            return;
+        }
+        event.preventDefault();
+        submitter = event.submitter;
+        importConfirmation.showModal();
+        importConfirmation.querySelector('[data-import-confirmation-cancel]').focus();
+    });
+    importConfirmation.querySelector('[data-import-confirmation-cancel]').addEventListener('click', () => importConfirmation.close());
+    importConfirmation.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') event.stopPropagation();
+    });
+    importConfirmation.addEventListener('close', () => submitter?.focus());
+    confirmButton.addEventListener('click', () => {
+        confirmed = true;
+        importForm.requestSubmit();
+    });
+}
+
+if (isImportModalFrame) {
+    document.querySelectorAll('[data-import-modal-value]').forEach((input) => { input.value = '1'; });
+    const backLink = document.querySelector('[data-import-modal-dismiss]');
+    if (backLink && !document.querySelector('[data-import-completed]')) backLink.hidden = true;
+    document.addEventListener('click', (event) => {
+        if (event.target.closest?.('[data-import-modal-dismiss]')) {
+            event.preventDefault();
+            window.parent.postMessage({ type: 'simpeg-import-close' }, window.location.origin);
+        }
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            window.parent.postMessage({ type: 'simpeg-import-close' }, window.location.origin);
+        }
+    });
+}
+
+if (isWorkspaceFrame && !isImportModalFrame) {
+    document.addEventListener('click', (event) => {
+        const link = event.target.closest?.('[data-import-modal-link]');
+        if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        window.parent.postMessage({ type: 'simpeg-import-open', url: link.href }, window.location.origin);
+    });
+}
+
+if (!isWorkspaceFrame) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'import-modal';
+    dialog.setAttribute('aria-labelledby', 'import-modal-title');
+    const header = document.createElement('div');
+    header.className = 'import-modal-header';
+    const title = document.createElement('h2');
+    title.id = 'import-modal-title';
+    title.className = 'section-heading';
+    title.textContent = 'Impor pegawai';
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'sidebar-control';
+    close.textContent = 'Tutup';
+    const frame = document.createElement('iframe');
+    const loading = document.createElement('p');
+    loading.className = 'px-4 py-3 text-sm text-slate-600';
+    loading.setAttribute('role', 'status');
+    loading.textContent = 'Memuat formulir impor…';
+    frame.className = 'import-modal-frame';
+    frame.title = 'Formulir impor pegawai';
+    frame.dataset.workspaceFrame = '';
+    frame.dataset.importModalFrame = '';
+    header.append(title, close);
+    dialog.append(header, loading, frame);
+    document.body.append(dialog);
+    let sourceFrame = null;
+    let returnFocus = null;
+    let completed = false;
+    let savedOverflow = '';
+
+    const openImport = (url, source = null, trigger = null) => {
+        const target = new URL(url, window.location.href);
+        if (target.origin !== window.location.origin || target.pathname !== '/pegawai/impor-identitas' || dialog.open) return;
+        sourceFrame = source;
+        returnFocus = trigger ?? source;
+        completed = false;
+        loading.hidden = false;
+        frame.src = target.href;
+        savedOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        dialog.showModal();
+        close.focus();
+    };
+    frame.addEventListener('load', () => {
+        loading.hidden = true;
+        completed = Boolean(frame.contentDocument?.querySelector('[data-import-completed]'));
+    });
+    close.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('close', () => {
+        document.body.style.overflow = savedOverflow;
+        returnFocus?.focus();
+        frame.removeAttribute('src');
+        if (completed) {
+            if (sourceFrame) sourceFrame.contentWindow.location.reload();
+            else window.location.reload();
+        }
+    });
+    document.addEventListener('click', (event) => {
+        const link = event.target.closest?.('[data-import-modal-link]');
+        if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        openImport(link.href, null, link);
+    });
+    window.addEventListener('message', (event) => {
+        if (event.origin !== window.location.origin) return;
+        if (event.source === frame.contentWindow && event.data?.type === 'simpeg-import-close') {
+            dialog.close();
+            return;
+        }
+        const source = Array.from(document.querySelectorAll('[data-workspace-panels] iframe[data-workspace-frame]'))
+            .find((candidate) => candidate.contentWindow === event.source);
+        if (source && event.data?.type === 'simpeg-import-open' && typeof event.data.url === 'string') {
+            openImport(event.data.url, source);
+        }
+    });
+}
 
 const navigationShell = document.querySelector('[data-navigation-shell]');
 
@@ -21,6 +278,11 @@ if (navigationShell && !isWorkspaceFrame) {
         toggleLabel.textContent = desktop.matches
             ? (collapsed ? 'Tampilkan menu' : 'Sembunyikan menu')
             : 'Menu';
+        if (desktop.matches) {
+            toggle.title = toggleLabel.textContent;
+        } else {
+            toggle.removeAttribute('title');
+        }
         backdrop.hidden = desktop.matches || !mobileOpen;
 
         if (!desktop.matches && mobileOpen) {
@@ -2019,16 +2281,16 @@ document.querySelectorAll('label.form-label[for]').forEach((label) => {
     }
 });
 
-const floatingFieldControlSelector = [
+const countedFieldControlSelector = [
     'input.form-input:not([type="hidden"]):not([type="file"]):not([type="date"]):not([type="time"]):not([type="datetime-local"]):not([type="month"]):not([type="week"]):not([type="color"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="search"]):not([type="number"]):not([readonly])',
     'textarea.form-textarea:not([readonly])',
 ].join(', ');
 
 const isImportManagedField = (control) => Boolean(control.closest?.('[data-import-managed]'));
 
-const floatingFieldSynchronizers = [];
+const fieldCounterSynchronizers = [];
 
-document.querySelectorAll(floatingFieldControlSelector).forEach((control) => {
+document.querySelectorAll(countedFieldControlSelector).forEach((control) => {
     if (isImportManagedField(control)) {
         return;
     }
@@ -2047,25 +2309,6 @@ document.querySelectorAll(floatingFieldControlSelector).forEach((control) => {
         return;
     }
 
-    fieldContainer.classList.add('form-field-floating');
-
-    if (control instanceof HTMLTextAreaElement) {
-        fieldContainer.classList.add('is-textarea');
-    }
-
-    if (!control.getAttribute('placeholder')) {
-        control.setAttribute('placeholder', ' ');
-    }
-
-    const syncFloatingField = () => {
-        fieldContainer.classList.toggle('is-filled', control.value.trim().length > 0);
-    };
-
-    control.addEventListener('input', syncFloatingField);
-    control.addEventListener('change', syncFloatingField);
-    floatingFieldSynchronizers.push(syncFloatingField);
-    syncFloatingField();
-
     if (control.maxLength < 0 || fieldContainer.querySelector('[data-form-field-counter]')) {
         return;
     }
@@ -2075,18 +2318,18 @@ document.querySelectorAll(floatingFieldControlSelector).forEach((control) => {
         counter.textContent = `${control.value.length}/${control.maxLength}`;
     };
 
-    fieldContainer.classList.add('has-counter');
     counter.className = 'form-field-counter';
     counter.dataset.formFieldCounter = '';
     counter.setAttribute('aria-hidden', 'true');
     control.addEventListener('input', updateCounter);
     control.addEventListener('change', updateCounter);
+    fieldCounterSynchronizers.push(updateCounter);
     updateCounter();
     fieldContainer.append(counter);
 });
 
 window.addEventListener('pageshow', () => {
-    floatingFieldSynchronizers.forEach((syncFloatingField) => syncFloatingField());
+    fieldCounterSynchronizers.forEach((updateCounter) => updateCounter());
 });
 
 document.querySelectorAll('[data-unit-admin-form]').forEach((form) => {

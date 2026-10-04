@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Api\V1;
 
 use App\Models\Employee;
+use App\Support\EmployeeImportColumns;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -31,18 +32,15 @@ class EmployeeResource extends JsonResource
                 'title' => $this->position?->name ?? $this->position_title,
             ],
             'department' => [
-                'id' => $currentPositionHistory?->department_id ?? $this->department?->id,
-                'name' => $currentPositionHistory?->department_name ?? $this->department?->name,
+                'id' => $this->department?->id ?? $currentPositionHistory?->department_id,
+                'name' => $this->department?->name ?? $currentPositionHistory?->department_name,
             ],
             'service_started_on' => $this->service_started_on?->toDateString(),
             'nip_tmt_valid' => $this->nip_tmt_valid,
             'birth_date' => $this->birth_date?->toDateString(),
             'gender' => $this->gender,
             'position_type' => $this->position_type,
-            'position_type_label' => [
-                1 => 'Struktural',
-                3 => 'Fungsional Umum',
-            ][$this->position_type] ?? null,
+            'position_type_label' => Employee::POSITION_TYPES[$this->position_type] ?? null,
             'eselon' => $this->eselon,
             'marital_status' => $this->marital_status,
             'marital_status_label' => [
@@ -84,6 +82,8 @@ class EmployeeResource extends JsonResource
             ];
         }
 
-        return $data;
+        return $request->query('view') === 'imported'
+            ? EmployeeImportColumns::project($data, $this->imported_api_fields ?? [])
+            : $data;
     }
 }

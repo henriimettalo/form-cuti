@@ -10,7 +10,10 @@ use App\Models\LeaveType;
 use App\Models\OrganizationProfile;
 use App\Models\Position;
 use App\Models\User;
+use App\Services\EmployeeIdentityImportService;
+use App\Services\PayrollImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Laravel\Sanctum\PersonalAccessToken;
 use Tests\TestCase;
 
@@ -87,13 +90,14 @@ class ApiIntegrationTest extends TestCase
     public function test_employee_write_endpoint_creates_employee_with_leave_balance_and_history(): void
     {
         $user = User::factory()->create();
-        $token = $this->tokenFor($user, ['employees:write']);
+        $token = $this->tokenFor($user, ['employees:write', 'employees:profile']);
         $payload = [
             'nip' => '199001012020011102',
             'full_name' => 'Pegawai Dari API',
             'employment_status' => 'PNS',
             'rank_grade' => 'III/b',
             'position_title' => 'Jabatan API Baru',
+            'position_type' => 2,
             'service_started_on' => '2020-01-01',
             'email' => 'pegawai.api@example.test',
         ];
@@ -103,7 +107,9 @@ class ApiIntegrationTest extends TestCase
             ->assertCreated()
             ->assertHeader('Location', route('api.v1.employees.show', ['employee' => $payload['nip']]))
             ->assertJsonPath('data.nip', $payload['nip'])
-            ->assertJsonPath('data.rank.grade', 'III/b');
+            ->assertJsonPath('data.rank.grade', 'III/b')
+            ->assertJsonPath('data.position_type', 2)
+            ->assertJsonPath('data.position_type_label', 'Fungsional');
 
         $employee = Employee::query()->where('nip', $payload['nip'])->firstOrFail();
 
@@ -213,6 +219,72 @@ class ApiIntegrationTest extends TestCase
             ->assertRedirect(route('api-tokens.index'));
 
         $this->assertDatabaseMissing('personal_access_tokens', ['id' => $token->id]);
+    }
+
+    public function test_imported_view_returns_only_headers_from_latest_identity_import_without_filtering_employees(): void
+    {
+        $employee = $this->createEmployee('199001012020011101', 'Pegawai API');
+        $manual = $this->createEmployee('199001012020011102', 'Pegawai Manual');
+        $service = app(EmployeeIdentityImportService::class);
+        $service->store(UploadedFile::fake()->createWithContent('kontak.csv', "NIP,Nomor Telepon,Email\n{$employee->nip},081234567890,import@example.test"));
+        $token = $this->tokenFor(User::factory()->create(), ['employees:read']);
+        $this->withToken($token)->getJson(route('api.v1.employees.show', ['employee' => $employee->nip, 'view' => 'imported']))
+            ->assertOk()->assertExactJson(['data' => ['nip' => $employee->nip, 'phone' => '081234567890', 'email' => 'import@example.test']]);
+        $this->withToken($token)->getJson(route('api.v1.employees.index', ['view' => 'imported']))
+            ->assertOk()->assertJsonCount(2, 'data')->assertJsonMissingPath('data.0.id')->assertJsonMissingPath('data.0.full_name');
+        $this->withToken($token)->getJson(route('api.v1.employees.show', ['employee' => $manual->nip, 'view' => 'imported']))
+            ->assertOk()->assertExactJson(['data' => ['nip' => $manual->nip]]);
+        $service->store(UploadedFile::fake()->createWithContent('nama.csv', "NIP,Nama Lengkap\n{$employee->nip},Nama Baru"));
+        $this->withToken($token)->getJson(route('api.v1.employees.show', ['employee' => $employee->nip, 'view' => 'imported']))
+            ->assertOk()->assertExactJson(['data' => ['nip' => $employee->nip, 'full_name' => 'Nama Baru']]);
+        $this->withToken($token)->getJson(route('api.v1.employees.show', ['employee' => $employee->nip]))
+            ->assertOk()->assertJsonPath('data.email', 'import@example.test')->assertJsonPath('data.rank.grade', 'III/c');
+    }
+
+    public function test_payroll_import_projection_excludes_derived_and_financial_fields_and_respects_profile_permission(): void
+    {
+        $employee = $this->createEmployee('199001012020011101', 'Nama Lama');
+        $service = app(PayrollImportService::class);
+        $preview = $service->preview(UploadedFile::fake()->createWithContent('payroll.csv', "nip_pegawai,nama_pegawai,status_asn,golongan,nik_pegawai,nomor_rekening,gaji_pokok\n{$employee->nip},Nama Impor,1,III/a,6171052401900001,000123456,9000000"), 2026, 5, employeeDataOnly: true);
+        $this->assertNull($employee->fresh()->imported_api_fields);
+        $service->confirmEmployeeData($preview);
+        $data = ['nip' => $employee->nip, 'full_name' => 'Nama Impor', 'employment_status' => 'PNS', 'rank' => ['grade' => 'III/a']];
+        $user = User::factory()->create();
+        $this->withToken($this->tokenFor($user, ['employees:read']))
+            ->getJson(route('api.v1.employees.show', ['employee' => $employee->nip, 'view' => 'imported']))
+            ->assertOk()->assertExactJson(['data' => $data]);
+        $this->app['auth']->forgetGuards();
+        $this->withToken($this->tokenFor($user, ['employees:read', 'employees:profile']))
+            ->getJson(route('api.v1.employees.show', ['employee' => $employee->nip, 'view' => 'imported']))
+            ->assertOk()->assertExactJson(['data' => $data + ['sensitive' => ['nik' => '6171052401900001', 'bank_accounts' => [['account_number' => '000123456']]]]]);
+    }
+
+    public function test_imported_view_still_requires_read_permission_and_rejects_unknown_views(): void
+    {
+        $employee = $this->createEmployee('199001012020011101', 'Pegawai API');
+        $user = User::factory()->create();
+        $this->withToken($this->tokenFor($user, ['leave-requests:read']))
+            ->getJson(route('api.v1.employees.index', ['view' => 'imported']))->assertForbidden();
+        $this->app['auth']->forgetGuards();
+        $token = $this->tokenFor($user, ['employees:read']);
+        $this->withToken($token)->getJson(route('api.v1.employees.index', ['view' => 'other']))->assertUnprocessable()->assertJsonValidationErrors('view');
+        $this->withToken($token)->getJson(route('api.v1.employees.show', ['employee' => $employee->nip, 'view' => 'other']))->assertUnprocessable()->assertJsonValidationErrors('view');
+    }
+
+    public function test_reimport_can_record_api_columns_without_changing_existing_employee_values(): void
+    {
+        $employee = $this->createEmployee('199001012020011101', 'Nama Tetap');
+        $service = app(EmployeeIdentityImportService::class);
+        $file = UploadedFile::fake()->createWithContent('sama.csv', "NIP,Nama Lengkap\n{$employee->nip},Nama Tetap");
+        $preview = $service->preview($file);
+        $this->assertTrue($preview['valid_rows'][0]['record_columns_only']);
+        $this->assertSame([], $preview['valid_rows'][0]['changes']);
+        $this->assertNull($employee->fresh()->imported_api_fields);
+        $this->assertSame(1, $service->store($file));
+        $this->assertSame('Nama Tetap', $employee->fresh()->full_name);
+        $this->assertSame(['nip', 'full_name'], $employee->fresh()->imported_api_fields);
+        $this->assertDatabaseCount('employees', 1);
+        $this->assertSame([], $service->preview($file)['valid_rows']);
     }
 
     /**
