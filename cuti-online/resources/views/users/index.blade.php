@@ -258,7 +258,6 @@
                                 <th class="pb-3 pr-5 font-semibold">Kode aplikasi</th>
                                 <th class="pb-3 pr-5 font-semibold">Kode SIMPEG</th>
                                 <th class="pb-3 pr-5 font-semibold">Induk unit</th>
-                                <th class="pb-3 pr-5 font-semibold">Kelompok apel</th>
                                 <th class="pb-3 pr-5 font-semibold">Status</th>
                                 <th class="pb-3 text-right font-semibold">Aksi</th>
                             </tr>
@@ -276,7 +275,6 @@
                                     <td class="py-4 pr-5 tabular-nums text-slate-600">{{ $department->code ?: '-' }}</td>
                                     <td class="py-4 pr-5 tabular-nums text-slate-600">{{ $department->simpeg_code ?: '-' }}</td>
                                     <td class="py-4 pr-5 text-slate-600">{{ $department->parent?->name ?: '-' }}</td>
-                                    <td class="py-4 pr-5 text-slate-600">{{ $department->department_type === 'kelurahan' && $department->ceremony_group_number ? 'Kelompok '.$department->ceremony_group_number : '-' }}</td>
                                     <td class="py-4 pr-5">
                                         <span class="{{ $department->is_active ? 'status-generated' : 'status-void' }}">
                                             {{ $department->is_active ? 'Aktif' : 'Nonaktif' }}
@@ -297,7 +295,6 @@
                                                 data-department-parent-id="{{ $department->parent_department_id }}"
                                                 data-department-address="{{ $department->address }}"
                                                 data-department-phone="{{ $department->phone }}"
-                                                data-department-ceremony-group="{{ $department->ceremony_group_number }}"
                                             >Edit</button>
                                         @if ($department->is_active)
                                             <form method="POST" action="{{ route('users.departments.deactivate', $department) }}" data-department-confirm-form data-department-name="{{ $department->name }}" data-department-status="deactivate">
@@ -392,18 +389,6 @@
                         <label class="form-label" for="department_editor_name">Nama unit</label>
                         <input class="form-input" id="department_editor_name" name="department_name" value="{{ old('department_name') }}" maxlength="255" placeholder="Contoh: Kelurahan Akcaya" required>
                         @error('department_name') <p class="form-error">{{ $message }}</p> @enderror
-                    </div>
-
-                    <div data-department-ceremony-group-wrap>
-                        <label class="form-label" for="department_editor_ceremony_group">Kelompok apel (1–4)</label>
-                        <select class="form-input" id="department_editor_ceremony_group" name="ceremony_group_number" data-department-editor-ceremony-group>
-                            <option value="">Pilih kelompok</option>
-                            @foreach (range(1, 4) as $groupNumber)
-                                <option value="{{ $groupNumber }}" @selected((string) old('ceremony_group_number') === (string) $groupNumber)>Kelompok {{ $groupNumber }}</option>
-                            @endforeach
-                        </select>
-                        <p class="form-help">Nomor ini digunakan otomatis pada kalender apel saat kelurahan ditugaskan.</p>
-                        @error('ceremony_group_number') <p class="form-error">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="grid gap-5 lg:grid-cols-2">

@@ -156,7 +156,6 @@ class RoleAndUnitAccessTest extends TestCase
                 'department_name' => 'Kelurahan Parittokaya',
                 'department_address' => 'Jalan Baru Parittokaya',
                 'department_phone' => '0561-333444',
-                'ceremony_group_number' => 2,
             ])
             ->assertRedirect(route('users.index'));
 
@@ -169,7 +168,7 @@ class RoleAndUnitAccessTest extends TestCase
             'parent_department_id' => $newParent->id,
             'address' => 'Jalan Baru Parittokaya',
             'phone' => '0561-333444',
-            'ceremony_group_number' => 2,
+            'ceremony_group_number' => null,
         ]);
     }
 

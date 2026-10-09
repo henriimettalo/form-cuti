@@ -2787,8 +2787,6 @@ if (departmentEditorOverlay) {
     const departmentEditorSimpegCode = departmentEditorForm.querySelector('#department_editor_simpeg_code');
     const departmentEditorPhone = departmentEditorForm.querySelector('#department_editor_phone');
     const departmentEditorAddress = departmentEditorForm.querySelector('#department_editor_address');
-    const departmentEditorCeremonyGroup = departmentEditorForm.querySelector('[data-department-editor-ceremony-group]');
-    const departmentEditorCeremonyGroupWrap = departmentEditorForm.querySelector('[data-department-ceremony-group-wrap]');
     const departmentEditorContext = departmentEditorForm.querySelector('[data-department-editor-context-input]');
     const departmentEditorId = departmentEditorForm.querySelector('[data-department-editor-id-input]');
     const departmentEditorMethod = departmentEditorForm.querySelector('[data-department-editor-method]');
@@ -2836,9 +2834,6 @@ if (departmentEditorOverlay) {
     const syncEditorFields = () => {
         normalizeEditorCode();
         syncEditorParent();
-        const isKelurahan = departmentEditorType.value === 'kelurahan';
-        departmentEditorCeremonyGroupWrap.hidden = !isKelurahan;
-        departmentEditorCeremonyGroup.required = isKelurahan;
     };
 
     const hideCurrentParentOption = (departmentId) => {
@@ -2900,7 +2895,6 @@ if (departmentEditorOverlay) {
             departmentEditorName.value = '';
             departmentEditorPhone.value = '';
             departmentEditorAddress.value = '';
-            departmentEditorCeremonyGroup.value = '';
         }
 
         syncEditorFields();
@@ -2930,7 +2924,6 @@ if (departmentEditorOverlay) {
             departmentEditorName.value = button.dataset.departmentName ?? '';
             departmentEditorPhone.value = button.dataset.departmentPhone ?? '';
             departmentEditorAddress.value = button.dataset.departmentAddress ?? '';
-            departmentEditorCeremonyGroup.value = button.dataset.departmentCeremonyGroup ?? '';
         }
 
         syncEditorFields();

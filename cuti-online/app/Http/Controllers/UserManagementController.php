@@ -311,7 +311,6 @@ class UserManagementController extends Controller
             ],
             'department_address' => ['nullable', 'string', 'max:2000'],
             'department_phone' => ['nullable', 'string', 'max:32'],
-            'ceremony_group_number' => ['nullable', 'integer', 'between:1,4'],
         ];
     }
 
@@ -334,7 +333,6 @@ class UserManagementController extends Controller
             'name' => $data['department_name'],
             'address' => $data['department_address'] ?? null,
             'phone' => $data['department_phone'] ?? null,
-            'ceremony_group_number' => $data['department_type'] === 'kelurahan' ? ($data['ceremony_group_number'] ?? null) : null,
         ];
     }
 
