@@ -40,6 +40,14 @@
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m3 13 9-9 9 9M5 11v9a1 1 0 0 0 1 1h3v-6h6v6h3a1 1 0 0 0 1-1v-9" /></svg>
                         Dashboard
                     </a>
+                    <a class="sidebar-link {{ request()->routeIs('ceremony-schedules.*', 'counter-duty.*') ? 'sidebar-link-active' : '' }}" href="{{ route('ceremony-schedules.index', ['year' => 2026, 'tab' => 'kalender']) }}" data-workspace-link data-workspace-title="Jadwal Kegiatan">
+                        <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 3v4m8-4v4M3 10h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm3 9h2m4 0h2m-8 4h2" /></svg>
+                        Jadwal Kegiatan
+                    </a>
+                    <a class="sidebar-link {{ request()->routeIs('holidays.*') ? 'sidebar-link-active' : '' }}" href="{{ route('holidays.index') }}" data-workspace-link data-workspace-title="Hari Libur">
+                        <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v4m8-4v4M4 9h16M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm3 9h.01m3 0h.01m3 0h.01m-6 4h.01m3 0h.01m3 0h.01" /></svg>
+                        Hari Libur
+                    </a>
                     @if ($showLegacyMasterNavigation)
                     <a class="sidebar-link {{ request()->routeIs('employees.*') && ! request()->routeIs('employees.change-logs.*') ? 'sidebar-link-active' : '' }}" href="{{ route('employees.index') }}" data-workspace-link data-workspace-title="Pegawai">
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19a6 6 0 0 0-12 0m6-8a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm6 3a4 4 0 0 1 4 4m-4-7a3 3 0 1 0 0-6" /></svg>

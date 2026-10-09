@@ -62,6 +62,23 @@ class EmployeeIdentityImportController extends Controller
         return to_route('employees.identity-import.create');
     }
 
+    public function cancel(Request $request): RedirectResponse|View
+    {
+        $path = $request->session()->get(self::PATH_KEY);
+
+        if ($path !== null) {
+            Storage::disk('local')->delete($path);
+        }
+
+        $request->session()->forget([self::SESSION_KEY, self::PATH_KEY]);
+
+        if ($request->boolean('modal')) {
+            return view('employees.identity-import-cancelled');
+        }
+
+        return to_route('employees.index')->with('status', 'Impor pegawai dibatalkan.');
+    }
+
     public function store(Request $request): RedirectResponse|View
     {
         $path = $request->session()->get(self::PATH_KEY);

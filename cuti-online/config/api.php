@@ -26,6 +26,14 @@ return [
             'label' => 'Baca formulir cuti',
             'description' => 'Melihat daftar dan detail formulir cuti melalui API.',
         ],
+        'ceremony-schedules:read' => [
+            'label' => 'Baca jadwal apel',
+            'description' => 'Melihat jadwal apel dan upacara melalui API.',
+        ],
+        'counter-duty-schedules:read' => [
+            'label' => 'Baca jadwal piket',
+            'description' => 'Melihat daftar petugas piket loket melalui API.',
+        ],
     ],
 
     'pagination' => [

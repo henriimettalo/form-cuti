@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\Position;
 use App\Support\EmployeeImportColumns;
 use App\Support\EmployeeNipMetadata;
+use App\Support\ImportDepartmentResolver;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -65,6 +66,7 @@ class EmployeeIdentityImportService
         $existingNips = Employee::query()->with('department')->withTrashed()
             ->get()->keyBy(fn ($employee) => EmployeeNipMetadata::digits($employee->nip));
 
+        $departments = Department::query()->where('is_active', true)->get();
         $seenNips = [];
         $validRows = [];
         $skipped = [];
@@ -80,6 +82,14 @@ class EmployeeIdentityImportService
             $data['_import_api_fields'] = EmployeeImportColumns::fromHeaderMap($headerMap);
 
             $messages = $this->rowMessages($data, $seenNips, $existingNips);
+            if ($data['department_name'] !== null) {
+                $department = ImportDepartmentResolver::resolve($data['department_name'], $departments);
+                if ($department === null) {
+                    $messages[] = "Unit kerja \"{$data['department_name']}\" tidak dikenali atau ambigu. Gunakan unit kerja aktif yang terdaftar di Akun & Unit.";
+                } else {
+                    $data['department_name'] = $department->name;
+                }
+            }
 
             if (empty($messages)) {
                 $nipLookup = EmployeeNipMetadata::digits($data['nip']);
@@ -141,7 +151,10 @@ class EmployeeIdentityImportService
             $count = 0;
             foreach ($preview['valid_rows'] as $row) {
                 $department = $row['department_name'] !== null
-                    ? Department::query()->firstOrCreate(['name' => $row['department_name']], ['is_active' => true]) : null;
+                    ? ImportDepartmentResolver::resolve($row['department_name']) : null;
+                if ($row['department_name'] !== null && $department === null) {
+                    throw new InvalidArgumentException('Unit kerja sudah tidak tersedia. Unggah ulang file untuk memperbarui pratinjau.');
+                }
                 $position = $row['position_title'] !== null
                     ? Position::query()->firstOrCreate(['name' => $row['position_title']], ['is_active' => true])
                     : null;
@@ -218,7 +231,7 @@ class EmployeeIdentityImportService
             ['Jabatan', 'Tidak', 'Nama jabatan spesifik. Kosongkan jika belum diketahui.'],
             ['Nomor Telepon', 'Tidak', '8-15 digit.'],
             ['Email', 'Tidak', 'Alamat email.'],
-            ['Unit Kerja', 'Tidak', 'Nama unit kerja. Nama yang belum terdaftar akan ditambahkan.'],
+            ['Unit Kerja', 'Tidak', 'Gunakan unit kerja aktif yang sudah terdaftar di Akun & Unit. Nama singkat kelurahan dipadankan dengan nama resminya.'],
         ], null, 'A1');
         $guide->getStyle('A1:C1')->getFont()->setBold(true);
         foreach (range('A', 'C') as $col) {
@@ -374,7 +387,7 @@ class EmployeeIdentityImportService
             $delimiter = substr_count($firstLine, ';') > substr_count($firstLine, ',') ? ';' : ',';
             $rows = [];
 
-            while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+            while (($row = fgetcsv($handle, 0, $delimiter, '"', '\\')) !== false) {
                 if ($rows === [] && isset($row[0])) {
                     $row[0] = preg_replace('/^\xEF\xBB\xBF/', '', (string) $row[0]);
                 }

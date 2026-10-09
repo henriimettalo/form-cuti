@@ -15,7 +15,14 @@
         </a>
     </div>
 
-    <section class="card mt-7">
+    <nav class="mt-7" data-account-tabs data-account-tab-default="import" role="tablist" aria-label="Impor pegawai">
+        <div class="flex flex-wrap gap-1 rounded-2xl bg-slate-100 p-1">
+            <button class="account-tab account-tab-active" id="employee-import-tab" type="button" role="tab" aria-selected="true" aria-controls="employee-import-panel" data-account-tab="import">Impor</button>
+            <button class="account-tab" id="employee-template-tab" type="button" role="tab" aria-selected="false" aria-controls="employee-template-panel" data-account-tab="template" tabindex="-1">Template</button>
+        </div>
+    </nav>
+
+    <section class="card mt-4" id="employee-template-panel" role="tabpanel" aria-labelledby="employee-template-tab" data-account-tab-panel="template" tabindex="0" hidden>
         <div class="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
                 <h2 class="section-heading">Mulai dari template</h2>
@@ -28,14 +35,15 @@
         </div>
     </section>
 
-    <form class="card mt-7" method="POST" action="{{ route('employees.identity-import.preview') }}" enctype="multipart/form-data">
+    <div id="employee-import-panel" role="tabpanel" aria-labelledby="employee-import-tab" data-account-tab-panel="import" tabindex="0">
+    <form class="card mt-4" method="POST" action="{{ route('employees.identity-import.preview') }}" enctype="multipart/form-data">
         @csrf
         <input type="hidden" name="modal" value="0" data-import-modal-value>
         <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_13rem] lg:items-start">
             <div class="min-w-0">
                 <label class="form-label" for="file">File data pegawai</label>
                 <input class="form-input" id="file" name="file" type="file" accept=".xlsx,.csv,text/csv" required>
-                <p class="form-help">Menerima Excel (.xlsx) atau CSV, maksimal 5 MB. Header: NIP, Nama Lengkap, Jabatan, Unit Kerja, Nomor Telepon, Email.</p>
+                <p class="form-help">Menerima Excel (.xlsx) atau CSV, maksimal 5 MB. Header: NIP, Nama Lengkap, Jabatan, Unit Kerja, Nomor Telepon, Email. Unit kerja harus sudah terdaftar dan aktif di Akun & Unit.</p>
                 @error('file') <p class="form-error">{{ $message }}</p> @enderror
             </div>
             <div class="flex lg:justify-end">
@@ -134,14 +142,18 @@
                     </div>
                 </div>
 
-                <form class="mt-5" method="POST" action="{{ route('employees.identity-import.store') }}" data-confirm-employee-import>
-                    @csrf
-                    <input type="hidden" name="modal" value="0" data-import-modal-value>
-                    <div class="flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
-                        <a class="btn-secondary" href="{{ route('employees.identity-import.create') }}">Batal</a>
-                        <button class="btn-primary" type="submit">Impor {{ count($p['valid_rows']) }} pegawai</button>
-                    </div>
-                </form>
+                <div class="mt-5 flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
+                    <form method="POST" action="{{ route('employees.identity-import.cancel') }}">
+                        @csrf
+                        <input type="hidden" name="modal" value="0" data-import-modal-value>
+                        <button class="btn-secondary w-full" type="submit">Batal</button>
+                    </form>
+                    <form method="POST" action="{{ route('employees.identity-import.store') }}" data-confirm-employee-import>
+                        @csrf
+                        <input type="hidden" name="modal" value="0" data-import-modal-value>
+                        <button class="btn-primary w-full" type="submit">Impor {{ count($p['valid_rows']) }} pegawai</button>
+                    </form>
+                </div>
                 <dialog class="import-confirmation" aria-labelledby="import-confirmation-title" aria-describedby="import-confirmation-description" data-import-confirmation>
                     <h2 class="page-title" id="import-confirmation-title">Impor {{ count($p['valid_rows']) }} pegawai?</h2>
                     <p class="page-description mt-3" id="import-confirmation-description">{{ $createCount }} pegawai ditambahkan dan {{ $updateCount }} pegawai diperbarui sesuai pratinjau. Kolom kosong tidak menghapus data yang sudah tersimpan.</p>
@@ -153,4 +165,5 @@
             @endif
         </section>
     @endif
+    </div>
 @endsection

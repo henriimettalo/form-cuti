@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\EmployeeController;
 use App\Http\Controllers\Api\V1\LeaveRequestController;
+use App\Http\Controllers\Api\V1\ScheduleController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')
@@ -22,4 +23,10 @@ Route::prefix('v1')
         Route::get('/leave-requests/{leaveRequest:public_id}', [LeaveRequestController::class, 'show'])
             ->middleware('abilities:leave-requests:read')
             ->name('api.v1.leave-requests.show');
+        Route::get('/ceremony-schedules', [ScheduleController::class, 'ceremonies'])
+            ->middleware('abilities:ceremony-schedules:read')
+            ->name('api.v1.ceremony-schedules.index');
+        Route::get('/counter-duty-schedules', [ScheduleController::class, 'counterDuty'])
+            ->middleware('abilities:counter-duty-schedules:read')
+            ->name('api.v1.counter-duty-schedules.index');
     });

@@ -13,6 +13,47 @@ class EmployeeIndexFilterTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_employee_headers_sort_all_records_in_both_directions_and_preserve_filters(): void
+    {
+        $operator = User::factory()->create();
+        $unitA = Department::query()->create(['name' => 'Unit A', 'is_active' => true]);
+        $unitZ = Department::query()->create(['name' => 'Unit Z', 'is_active' => true]);
+        $a = Employee::query()->create(['nip' => '199001012020011001', 'full_name' => 'Anna', 'grade' => 'IV/a', 'rank_name' => 'Pembina', 'department_id' => $unitZ->id, 'employment_status' => 'PNS', 'is_active' => false]);
+        $b = Employee::query()->create(['nip' => '199001012020011002', 'full_name' => 'Budi', 'grade' => 'II/a', 'rank_name' => 'Pengatur Muda', 'department_id' => $unitA->id, 'employment_status' => 'PNS', 'is_active' => true]);
+        $c = Employee::query()->create(['nip' => '199001012020011003', 'full_name' => 'citra', 'grade' => 'III/a', 'rank_name' => 'Penata Muda', 'employment_status' => 'PNS', 'is_active' => true]);
+        $c->positionHistories()->create(['position_title' => 'Staf', 'department_name' => 'Unit M', 'effective_on' => '2026-01-01']);
+        foreach ([
+            'name' => [$a->id, $b->id, $c->id],
+            'rank' => [$b->id, $c->id, $a->id],
+            'department' => [$b->id, $c->id, $a->id],
+            'status' => [$a->id, $b->id, $c->id],
+        ] as $sort => $ids) {
+            $this->actingAs($operator)->get(route('employees.index', ['sort' => $sort, 'direction' => 'asc', 'employment_status' => 'PNS', 'per_page' => 20]))
+                ->assertOk()->assertSee('aria-sort="ascending"', false)
+                ->assertSee('direction=desc', false)->assertSee('employment_status=PNS', false)
+                ->assertViewHas('employees', fn ($employees) => $employees->pluck('id')->all() === $ids);
+            $descending = $sort === 'status' ? [$b->id, $c->id, $a->id] : array_reverse($ids);
+            $this->actingAs($operator)->get(route('employees.index', ['sort' => $sort, 'direction' => 'desc']))
+                ->assertOk()->assertSee('aria-sort="descending"', false)
+                ->assertViewHas('employees', fn ($employees) => $employees->pluck('id')->all() === $descending);
+        }
+        $this->actingAs($operator)->get(route('employees.index', ['sort' => 'unknown']))->assertSessionHasErrors('sort');
+        $this->actingAs($operator)->get(route('employees.index', ['sort' => 'name', 'direction' => 'unknown']))->assertSessionHasErrors('direction');
+    }
+
+    public function test_sort_runs_before_pagination_and_keeps_page_order_stable(): void
+    {
+        $operator = User::factory()->create();
+        for ($index = 12; $index >= 1; $index--) {
+            Employee::query()->create(['nip' => '19900101202001'.str_pad((string) $index, 4, '0', STR_PAD_LEFT), 'full_name' => sprintf('Pegawai %02d', $index), 'is_active' => true]);
+        }
+        $this->actingAs($operator)->get(route('employees.index', ['sort' => 'name', 'direction' => 'asc', 'per_page' => 10]))
+            ->assertOk()->assertSee('sort=name', false)->assertSee('direction=asc', false)
+            ->assertViewHas('employees', fn ($employees) => $employees->first()->full_name === 'Pegawai 01' && $employees->last()->full_name === 'Pegawai 10');
+        $this->actingAs($operator)->get(route('employees.index', ['sort' => 'name', 'direction' => 'asc', 'per_page' => 10, 'page' => 2]))
+            ->assertOk()->assertViewHas('employees', fn ($employees) => $employees->first()->full_name === 'Pegawai 11' && $employees->last()->full_name === 'Pegawai 12');
+    }
+
     public function test_operator_can_search_employees_by_name_nip_position_and_department(): void
     {
         $operator = User::factory()->create();

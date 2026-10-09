@@ -9,16 +9,16 @@
             || strtolower(trim((string) $dashboardUser->role)) === 'operator';
     @endphp
 
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-5">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
         <div>
             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Sistem kepegawaian</p>
             <h1 class="page-title mt-2">{{ $canManageMasterData ? 'Kelola data dan riwayat pegawai dalam satu tempat.' : 'Buat dan pantau formulir cuti unit kerja Anda.' }}</h1>
             <p class="page-description">{{ $canManageMasterData ? 'Profil pegawai menjadi sumber data utama; formulir cuti menggunakan data tersebut lalu menyimpannya sebagai arsip dokumen.' : 'Formulir cuti hanya menampilkan pegawai dan dokumen pada unit kerja Anda.' }}</p>
         </div>
-        <div class="flex flex-wrap gap-2 sm:gap-3">
-            <a class="btn-secondary shrink-0" href="{{ route('leave-requests.create') }}" data-workspace-link data-workspace-title="Buat Formulir Cuti">Buat formulir cuti</a>
+        <div class="flex shrink-0 items-center gap-2 sm:gap-3">
+            <a class="btn-secondary whitespace-nowrap" href="{{ route('leave-requests.create') }}" data-workspace-link data-workspace-title="Buat Formulir Cuti">Buat formulir cuti</a>
             @if ($canManageMasterData)
-                <a class="btn-primary shrink-0" href="{{ route('employees.create') }}">
+                <a class="btn-primary whitespace-nowrap" href="{{ route('employees.create') }}">
                     <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                     Tambah pegawai
                 </a>

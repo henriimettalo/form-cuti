@@ -258,6 +258,7 @@
                                 <th class="pb-3 pr-5 font-semibold">Kode aplikasi</th>
                                 <th class="pb-3 pr-5 font-semibold">Kode SIMPEG</th>
                                 <th class="pb-3 pr-5 font-semibold">Induk unit</th>
+                                <th class="pb-3 pr-5 font-semibold">Kelompok apel</th>
                                 <th class="pb-3 pr-5 font-semibold">Status</th>
                                 <th class="pb-3 text-right font-semibold">Aksi</th>
                             </tr>
@@ -275,6 +276,7 @@
                                     <td class="py-4 pr-5 tabular-nums text-slate-600">{{ $department->code ?: '-' }}</td>
                                     <td class="py-4 pr-5 tabular-nums text-slate-600">{{ $department->simpeg_code ?: '-' }}</td>
                                     <td class="py-4 pr-5 text-slate-600">{{ $department->parent?->name ?: '-' }}</td>
+                                    <td class="py-4 pr-5 text-slate-600">{{ $department->department_type === 'kelurahan' && $department->ceremony_group_number ? 'Kelompok '.$department->ceremony_group_number : '-' }}</td>
                                     <td class="py-4 pr-5">
                                         <span class="{{ $department->is_active ? 'status-generated' : 'status-void' }}">
                                             {{ $department->is_active ? 'Aktif' : 'Nonaktif' }}
@@ -295,6 +297,7 @@
                                                 data-department-parent-id="{{ $department->parent_department_id }}"
                                                 data-department-address="{{ $department->address }}"
                                                 data-department-phone="{{ $department->phone }}"
+                                                data-department-ceremony-group="{{ $department->ceremony_group_number }}"
                                             >Edit</button>
                                         @if ($department->is_active)
                                             <form method="POST" action="{{ route('users.departments.deactivate', $department) }}" data-department-confirm-form data-department-name="{{ $department->name }}" data-department-status="deactivate">
@@ -318,7 +321,7 @@
         </section>
 
         <div
-            class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/60 p-4 opacity-0 transition-opacity duration-150"
+            class="fixed inset-0 z-[100] hidden items-start justify-center overflow-y-auto overscroll-contain bg-slate-950/60 p-4 opacity-0 transition-opacity duration-150 sm:items-center"
             data-department-editor-overlay
             data-department-editor-open="{{ $departmentFormHasErrors ? 'true' : 'false' }}"
             data-department-editor-context="{{ $departmentFormContext }}"
@@ -328,7 +331,7 @@
             aria-hidden="true"
             style="backdrop-filter: blur(2px);"
         >
-            <div class="w-full max-w-3xl translate-y-2 rounded-2xl bg-white p-6 opacity-0 shadow-[0_24px_60px_rgba(15,23,42,0.24),0_4px_16px_rgba(15,23,42,0.12)] transition-[opacity,transform] duration-150" data-department-editor-dialog role="dialog" aria-modal="true" aria-labelledby="department-editor-title" aria-describedby="department-editor-description">
+            <div class="my-4 max-h-[calc(100dvh-2rem)] w-full max-w-3xl translate-y-2 overflow-y-auto overscroll-contain rounded-2xl bg-white p-6 opacity-0 shadow-[0_24px_60px_rgba(15,23,42,0.24),0_4px_16px_rgba(15,23,42,0.12)] transition-[opacity,transform] duration-150 sm:my-0 sm:max-h-[calc(100dvh-3rem)]" data-department-editor-dialog role="dialog" aria-modal="true" aria-labelledby="department-editor-title" aria-describedby="department-editor-description">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-100 pb-5">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.14em] text-sky-700" data-department-editor-kicker>Administrasi unit</p>
@@ -389,6 +392,18 @@
                         <label class="form-label" for="department_editor_name">Nama unit</label>
                         <input class="form-input" id="department_editor_name" name="department_name" value="{{ old('department_name') }}" maxlength="255" placeholder="Contoh: Kelurahan Akcaya" required>
                         @error('department_name') <p class="form-error">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div data-department-ceremony-group-wrap>
+                        <label class="form-label" for="department_editor_ceremony_group">Kelompok apel (1–4)</label>
+                        <select class="form-input" id="department_editor_ceremony_group" name="ceremony_group_number" data-department-editor-ceremony-group>
+                            <option value="">Pilih kelompok</option>
+                            @foreach (range(1, 4) as $groupNumber)
+                                <option value="{{ $groupNumber }}" @selected((string) old('ceremony_group_number') === (string) $groupNumber)>Kelompok {{ $groupNumber }}</option>
+                            @endforeach
+                        </select>
+                        <p class="form-help">Nomor ini digunakan otomatis pada kalender apel saat kelurahan ditugaskan.</p>
+                        @error('ceremony_group_number') <p class="form-error">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="grid gap-5 lg:grid-cols-2">

@@ -32,6 +32,8 @@
             'employment_status' => $filters['employment_status'],
             'department_id' => $filters['department_id'],
             'per_page' => $perPage,
+            'sort' => $sort,
+            'direction' => $direction,
         ], static fn ($value) => $value !== null && $value !== '');
     @endphp
     <nav class="employee-list-tabs mt-7" aria-label="Daftar dan arsip pegawai">
@@ -48,6 +50,10 @@
             <input type="hidden" name="archived" value="1">
         @endif
 
+        @if ($sort)
+            <input type="hidden" name="sort" value="{{ $sort }}">
+            <input type="hidden" name="direction" value="{{ $direction }}">
+        @endif
         <div @class([
             'grid gap-4 md:grid-cols-2 xl:items-end',
             'xl:grid-cols-[minmax(0,1.2fr)_12rem_14rem_11rem_auto]' => ! $showArchived,
@@ -167,10 +173,23 @@
                                     </label>
                                 </th>
                             @endif
-                            <th class="min-w-64 whitespace-nowrap pb-3 pr-6 font-semibold">Pegawai</th>
-                            <th class="min-w-48 whitespace-nowrap pb-3 pr-6 font-semibold">Pangkat/Golongan</th>
-                            <th class="min-w-48 whitespace-nowrap pb-3 pr-6 font-semibold">Unit kerja</th>
-                            <th class="min-w-24 whitespace-nowrap pb-3 pr-6 font-semibold">Status</th>
+                            @foreach (['name' => ['Pegawai', 'min-w-64'], 'rank' => ['Pangkat/Golongan', 'min-w-48'], 'department' => ['Unit kerja', 'min-w-48'], 'status' => ['Status', 'min-w-24']] as $column => [$label, $width])
+                                @php($nextDirection = $sort === $column && $direction === 'asc' ? 'desc' : 'asc')
+                                <th scope="col" class="{{ $width }} whitespace-nowrap pb-3 pr-6 font-semibold" aria-sort="{{ $sort === $column ? ($direction === 'asc' ? 'ascending' : 'descending') : 'none' }}">
+                                    <a class="inline-flex min-h-11 items-center gap-2 rounded-md hover:text-sky-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600 {{ $sort === $column ? 'text-sky-700' : 'text-slate-600' }}"
+                                       href="{{ route('employees.index', request()->except('page', 'sort', 'direction') + ['sort' => $column, 'direction' => $nextDirection]) }}"
+                                       aria-label="Urutkan {{ $label }} {{ $nextDirection === 'asc' ? 'menaik' : 'menurun' }}">
+                                        {{ $label }}
+                                        <svg aria-hidden="true" class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            @if ($sort === $column)
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="{{ $direction === 'asc' ? 'm7 14 5-5 5 5' : 'm7 10 5 5 5-5' }}" />
+                                            @else
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="m8 9 4-4 4 4m-8 6 4 4 4-4" />
+                                            @endif
+                                        </svg>
+                                    </a>
+                                </th>
+                            @endforeach
                             <th class="w-16 whitespace-nowrap pb-3 text-right font-semibold">Aksi</th>
                         </tr>
                     </thead>

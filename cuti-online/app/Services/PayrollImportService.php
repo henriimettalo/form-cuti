@@ -1309,7 +1309,7 @@ class PayrollImportService
             $delimiter = substr_count($firstLine, ';') > substr_count($firstLine, ',') ? ';' : ',';
             $rows = [];
 
-            while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+            while (($row = fgetcsv($handle, 0, $delimiter, '"', '\\')) !== false) {
                 if ($rows === [] && isset($row[0])) {
                     $row[0] = preg_replace('/^\xEF\xBB\xBF/', '', (string) $row[0]);
                 }

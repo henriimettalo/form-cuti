@@ -1,3 +1,299 @@
+document.querySelectorAll('[data-password-toggle]').forEach((button) => {
+    const input = document.getElementById(button.getAttribute('aria-controls'));
+    if (!input) return;
+
+    button.addEventListener('click', () => {
+        const visible = input.type === 'password';
+        input.type = visible ? 'text' : 'password';
+        const label = visible ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi';
+        button.setAttribute('aria-label', label);
+        button.setAttribute('aria-pressed', String(visible));
+        button.title = label;
+        button.querySelector('[data-password-show]')?.classList.toggle('hidden', visible);
+        button.querySelector('[data-password-hide]')?.classList.toggle('hidden', !visible);
+    });
+});
+
+document.querySelector('[data-calendar-today]')?.scrollIntoView({ block: 'center', inline: 'nearest' });
+
+document.querySelectorAll('[data-calendar-month-filter]').forEach((select) => {
+    select.addEventListener('change', () => select.form?.submit());
+});
+
+document.querySelectorAll('[data-calendar-year-filter]').forEach((select) => {
+    select.addEventListener('change', () => select.form?.submit());
+});
+
+document.querySelectorAll('[data-month-picker]').forEach((picker) => {
+    const trigger = picker.querySelector('[data-month-picker-trigger]');
+    const popover = picker.querySelector('[data-month-picker-popover]');
+    const valueInput = picker.querySelector('[data-month-picker-value]');
+    const splitYearInput = picker.querySelector('[data-month-picker-year-value]');
+    const splitMonthInput = picker.querySelector('[data-month-picker-month-value]');
+    const label = picker.querySelector('[data-month-picker-label]');
+    const yearSelect = picker.querySelector('[data-month-picker-year]');
+    const monthButtons = Array.from(picker.querySelectorAll('[data-month-picker-month]'));
+    if (!trigger || !popover || (!valueInput && (!splitYearInput || !splitMonthInput)) || !label || !yearSelect) return;
+
+    const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const updatePicker = (month) => {
+        const year = yearSelect.value;
+        const value = `${year}-${month}`;
+        if (valueInput) valueInput.value = value;
+        if (splitYearInput) splitYearInput.value = year;
+        if (splitMonthInput) splitMonthInput.value = Number(month);
+        picker.dataset.monthValue = value;
+        label.textContent = `${monthNames[Number(month) - 1]} ${year}`;
+        monthButtons.forEach((button) => button.setAttribute('aria-selected', String(button.dataset.monthPickerMonth === month)));
+    };
+    const closePicker = () => {
+        popover.hidden = true;
+        trigger.setAttribute('aria-expanded', 'false');
+    };
+    trigger.addEventListener('click', () => {
+        popover.hidden = !popover.hidden;
+        trigger.setAttribute('aria-expanded', String(!popover.hidden));
+    });
+    const submitAfterUpdate = () => {
+        if (picker.dataset.monthPickerAutoSubmit === 'true') picker.closest('form')?.submit();
+    };
+    monthButtons.forEach((button) => button.addEventListener('click', () => {
+        updatePicker(button.dataset.monthPickerMonth);
+        closePicker();
+        submitAfterUpdate();
+    }));
+    yearSelect.addEventListener('change', () => {
+        updatePicker(picker.dataset.monthValue.split('-')[1]);
+        submitAfterUpdate();
+    });
+    document.addEventListener('click', (event) => {
+        if (!picker.contains(event.target)) closePicker();
+    });
+    updatePicker(picker.dataset.monthValue.split('-')[1]);
+});
+
+const ceremonyCalendarYear = document.querySelector('[data-ceremony-calendar] input[name="year"]')?.value ?? '2026';
+const ceremonyCalendarStorageKey = `ceremony-calendar-${ceremonyCalendarYear}-assignments`;
+let ceremonyCalendarAssignments = {};
+try {
+    ceremonyCalendarAssignments = JSON.parse(localStorage.getItem(ceremonyCalendarStorageKey) ?? '{}');
+} catch (error) {
+    ceremonyCalendarAssignments = {};
+}
+
+const ceremonyCalendarDate = (select) => select.name.match(/^days\[([^\]]+)\]/)?.[1];
+const saveCeremonyCalendarAssignment = (select) => {
+    const date = ceremonyCalendarDate(select);
+    if (!date) return;
+    if (select.value) ceremonyCalendarAssignments[date] = select.value;
+    else delete ceremonyCalendarAssignments[date];
+    localStorage.setItem(ceremonyCalendarStorageKey, JSON.stringify(ceremonyCalendarAssignments));
+};
+
+document.querySelectorAll('[data-ceremony-department]').forEach((select) => {
+    const display = select.closest('[data-ceremony-department]')?.parentElement?.querySelector('[data-ceremony-group-display]');
+    if (!display) return;
+    const syncCalendarCell = () => {
+        const date = select.name.match(/^days\[([^\]]+)\]/)?.[1];
+        const cell = Array.from(document.querySelectorAll('[data-calendar-date]')).find((candidate) => candidate.dataset.calendarDate === date);
+        if (!cell) return;
+        const group = select.selectedOptions[0]?.dataset.group;
+        const label = select.selectedOptions[0]?.textContent?.split(' — ').slice(2).join(' — ').trim();
+        const calendarGroup = cell.querySelector('[data-calendar-group]');
+        const calendarDepartment = cell.querySelector('[data-calendar-department]');
+        if (calendarGroup) calendarGroup.textContent = group ? `Kelompok ${group}` : '';
+        if (calendarDepartment) calendarDepartment.textContent = label || 'Belum dipilih';
+    };
+    const updateGroupDisplay = () => {
+        const group = select.selectedOptions[0]?.dataset.group;
+        display.textContent = group ? `Kelompok ${group}` : 'Belum dipilih';
+        syncCalendarCell();
+        saveCeremonyCalendarAssignment(select);
+    };
+    select.addEventListener('change', updateGroupDisplay);
+    updateGroupDisplay();
+});
+
+document.querySelectorAll('[data-ceremony-calendar] tbody').forEach((tbody) => {
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const editableSelects = rows.map((row) => row.querySelector('[data-ceremony-department]')).filter((select) => select && !select.disabled);
+    const groups = [...new Set(Array.from(editableSelects[0]?.options ?? []).map((option) => Number(option.dataset.group)).filter(Boolean))].sort((left, right) => left - right);
+    if (!editableSelects.length || !groups.length) return;
+
+    const assignGroup = (select, group) => {
+        const option = Array.from(select.options).find((candidate) => Number(candidate.dataset.group) === group);
+        if (!option || select.value === option.value) return;
+        select.value = option.value;
+        const autoAssignedEvent = new Event('change', { bubbles: true });
+        autoAssignedEvent.autoAssigned = true;
+        select.dispatchEvent(autoAssignedEvent);
+    };
+
+    const resequenceFrom = (anchorSelect, selectedGroup) => {
+        const anchorIndex = editableSelects.indexOf(anchorSelect);
+        const selectedIndex = groups.indexOf(selectedGroup);
+        if (anchorIndex < 0 || selectedIndex < 0) return;
+
+        for (let index = anchorIndex - 1; index >= 0; index -= 1) {
+            const groupIndex = (selectedIndex - (anchorIndex - index) + groups.length * 2) % groups.length;
+            assignGroup(editableSelects[index], groups[groupIndex]);
+        }
+        for (let index = anchorIndex + 1; index < editableSelects.length; index += 1) {
+            const groupIndex = (selectedIndex + (index - anchorIndex)) % groups.length;
+            assignGroup(editableSelects[index], groups[groupIndex]);
+        }
+    };
+
+    editableSelects.forEach((select) => {
+        select.addEventListener('change', (event) => {
+            if (event.autoAssigned) return;
+            const selectedGroup = Number(select.selectedOptions[0]?.dataset.group ?? 0);
+            if (selectedGroup) resequenceFrom(select, selectedGroup);
+        });
+    });
+});
+
+document.querySelectorAll('[data-ceremony-calendar]').forEach((calendar) => {
+    const selects = Array.from(calendar.querySelectorAll('[data-ceremony-department]'));
+    const serverSeedGroup = Number(calendar.querySelector('[data-ceremony-seed-group]')?.value ?? 0);
+    const editableSelects = selects.filter((select) => !select.disabled);
+    editableSelects.forEach((select) => {
+        const storedValue = ceremonyCalendarAssignments[ceremonyCalendarDate(select)];
+        const storedOption = Array.from(select.options).find((option) => option.value === storedValue);
+        if (!select.value && storedOption) {
+            select.value = storedOption.value;
+            const restoredEvent = new Event('change', { bubbles: true });
+            restoredEvent.autoAssigned = true;
+            select.dispatchEvent(restoredEvent);
+        }
+    });
+    if (!editableSelects.length || editableSelects.some((select) => select.value)) return;
+    const groups = [...new Set(Array.from(editableSelects[0].options).map((option) => Number(option.dataset.group)).filter(Boolean))].sort((left, right) => left - right);
+    if (!groups.length) return;
+    const firstDate = ceremonyCalendarDate(editableSelects[0]);
+    const previousDates = Object.keys(ceremonyCalendarAssignments).filter((date) => date < firstDate).sort();
+    const previousValue = previousDates.length ? ceremonyCalendarAssignments[previousDates.at(-1)] : null;
+    const previousOption = Array.from(editableSelects[0].options).find((option) => option.value === previousValue);
+    const seedGroup = Number(previousOption?.dataset.group ?? serverSeedGroup);
+    const seedIndex = groups.indexOf(seedGroup);
+    const firstGroup = groups[(seedIndex + 1) % groups.length];
+    const firstOption = Array.from(editableSelects[0].options).find((option) => Number(option.dataset.group) === firstGroup);
+    if (!firstOption) return;
+    editableSelects[0].value = firstOption.value;
+    editableSelects[0].dispatchEvent(new Event('change', { bubbles: true }));
+});
+
+document.querySelectorAll('[data-ceremony-calendar] tbody tr').forEach((row) => {
+    const isMasuk = row.querySelector('[name$="[is_masuk]"]');
+    const isLibur = row.querySelector('[name$="[is_libur]"]');
+    const department = row.querySelector('[name$="[department_id]"]');
+    const summary = row.querySelector('[data-summary]');
+    const group = row.querySelector('[data-group]');
+    if (!isMasuk || !isLibur || !department || !summary || !group) return;
+    const updateRow = (source) => {
+        const holiday = source === isLibur ? source.value === '1' : source === isMasuk ? source.value === '0' : isLibur.value === '1';
+        isMasuk.value = holiday ? '0' : '1';
+        isLibur.value = holiday ? '1' : '0';
+        summary.textContent = holiday ? 'Libur' : department.value ? 'Masuk' : '';
+        department.disabled = holiday;
+        group.textContent = holiday ? '' : group.value;
+    };
+    isMasuk.addEventListener('change', () => updateRow(isMasuk));
+    isLibur.addEventListener('change', () => updateRow(isLibur));
+    department.addEventListener('change', () => updateRow(department));
+    updateRow(isLibur);
+});
+
+const ceremonyGroupsDialog = document.querySelector('[data-ceremony-groups-dialog]');
+if (ceremonyGroupsDialog) {
+    const groupCountInput = ceremonyGroupsDialog.querySelector('#group_count');
+    const groupCountLabel = ceremonyGroupsDialog.querySelector('[data-ceremony-groups-count-label]');
+    const decrementButton = ceremonyGroupsDialog.querySelector('[data-ceremony-groups-decrement]');
+    const incrementButton = ceremonyGroupsDialog.querySelector('[data-ceremony-groups-increment]');
+    const groupFields = ceremonyGroupsDialog.querySelector('[data-ceremony-group-fields]');
+    const saveGroupsButton = ceremonyGroupsDialog.querySelector('[data-ceremony-groups-save]');
+    const groupsError = ceremonyGroupsDialog.querySelector('[data-ceremony-groups-error]');
+    const optionData = (groupFields?.dataset.departmentOptions ?? '').split('||').filter(Boolean).map((entry) => entry.split('::'));
+    const rebuildGroupFields = () => {
+        if (!groupCountInput || !groupFields) return;
+        const count = Number(groupCountInput.value);
+        const currentValues = Array.from(groupFields.querySelectorAll('select')).map((select) => select.value);
+        groupFields.replaceChildren();
+        for (let groupNumber = 1; groupNumber <= count; groupNumber += 1) {
+            const wrapper = document.createElement('div');
+            const label = document.createElement('label');
+            label.className = 'form-label';
+            label.htmlFor = `group-${groupNumber}`;
+            label.textContent = `Kelompok ${groupNumber}`;
+            const select = document.createElement('select');
+            select.className = 'form-select';
+            select.id = `group-${groupNumber}`;
+            select.name = `group_departments[${groupNumber}]`;
+            select.required = true;
+            select.innerHTML = '<option value="">Pilih kelurahan</option>';
+            optionData.forEach(([value, text]) => select.add(new Option(text, value)));
+            select.value = currentValues[groupNumber - 1] ?? '';
+            wrapper.append(label, select);
+            groupFields.append(wrapper);
+        }
+        groupCountLabel?.replaceChildren(`${count} kelompok`);
+        if (decrementButton) decrementButton.disabled = count <= Number(groupCountInput.min);
+        if (incrementButton) incrementButton.disabled = count >= Number(groupCountInput.max);
+    };
+    const changeGroupCount = (offset) => {
+        if (!groupCountInput) return;
+        const min = Number(groupCountInput.min);
+        const max = Number(groupCountInput.max);
+        groupCountInput.value = String(Math.min(max, Math.max(min, Number(groupCountInput.value) + offset)));
+        rebuildGroupFields();
+    };
+    decrementButton?.addEventListener('click', () => changeGroupCount(-1));
+    incrementButton?.addEventListener('click', () => changeGroupCount(1));
+    document.querySelector('[data-ceremony-groups-open]')?.addEventListener('click', () => ceremonyGroupsDialog.showModal());
+    document.querySelector('[data-ceremony-groups-close]')?.addEventListener('click', () => ceremonyGroupsDialog.close());
+    saveGroupsButton?.addEventListener('click', async () => {
+        if (!groupCountInput || !groupFields || !saveGroupsButton) return;
+        groupsError?.classList.add('hidden');
+        saveGroupsButton.disabled = true;
+        saveGroupsButton.textContent = 'Menyimpan…';
+        const formData = new FormData();
+        formData.append('_token', document.querySelector('[data-ceremony-calendar] input[name="_token"]')?.value ?? '');
+        formData.append('group_count', groupCountInput.value);
+        groupFields.querySelectorAll('select').forEach((select) => formData.append(select.name, select.value));
+        try {
+            const response = await fetch(ceremonyGroupsDialog.dataset.saveUrl, {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData,
+            });
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                throw new Error(Object.values(payload.errors ?? {}).flat()[0] ?? payload.message ?? 'Pengaturan kelompok gagal disimpan.');
+            }
+            window.location.reload();
+        } catch (error) {
+            if (groupsError) {
+                groupsError.textContent = error.message;
+                groupsError.classList.remove('hidden');
+            }
+            saveGroupsButton.disabled = false;
+            saveGroupsButton.textContent = 'Simpan kelompok';
+        }
+    });
+    ceremonyGroupsDialog.addEventListener('click', (event) => {
+        if (event.target === ceremonyGroupsDialog) ceremonyGroupsDialog.close();
+    });
+}
+
+const dutyGroupCreateDialog = document.querySelector('[data-duty-group-create-dialog]');
+if (dutyGroupCreateDialog) {
+    document.querySelector('[data-duty-group-create-open]')?.addEventListener('click', () => dutyGroupCreateDialog.showModal());
+    document.querySelector('[data-duty-group-create-close]')?.addEventListener('click', () => dutyGroupCreateDialog.close());
+    dutyGroupCreateDialog.addEventListener('click', (event) => {
+        if (event.target === dutyGroupCreateDialog) dutyGroupCreateDialog.close();
+    });
+}
+
 const isWorkspaceFrame = document.documentElement.dataset.workspaceFrame === 'true';
 const isImportModalFrame = window.frameElement?.hasAttribute('data-import-modal-frame') === true;
 
@@ -154,8 +450,12 @@ if (importConfirmation && importForm) {
 
 if (isImportModalFrame) {
     document.querySelectorAll('[data-import-modal-value]').forEach((input) => { input.value = '1'; });
+    const importCancelled = document.querySelector('[data-import-cancelled]');
     const backLink = document.querySelector('[data-import-modal-dismiss]');
-    if (backLink && !document.querySelector('[data-import-completed]')) backLink.hidden = true;
+    if (backLink && !document.querySelector('[data-import-completed]') && !importCancelled) backLink.hidden = true;
+    if (importCancelled) {
+        window.parent.postMessage({ type: 'simpeg-import-close' }, window.location.origin);
+    }
     document.addEventListener('click', (event) => {
         if (event.target.closest?.('[data-import-modal-dismiss]')) {
             event.preventDefault();
@@ -2487,6 +2787,8 @@ if (departmentEditorOverlay) {
     const departmentEditorSimpegCode = departmentEditorForm.querySelector('#department_editor_simpeg_code');
     const departmentEditorPhone = departmentEditorForm.querySelector('#department_editor_phone');
     const departmentEditorAddress = departmentEditorForm.querySelector('#department_editor_address');
+    const departmentEditorCeremonyGroup = departmentEditorForm.querySelector('[data-department-editor-ceremony-group]');
+    const departmentEditorCeremonyGroupWrap = departmentEditorForm.querySelector('[data-department-ceremony-group-wrap]');
     const departmentEditorContext = departmentEditorForm.querySelector('[data-department-editor-context-input]');
     const departmentEditorId = departmentEditorForm.querySelector('[data-department-editor-id-input]');
     const departmentEditorMethod = departmentEditorForm.querySelector('[data-department-editor-method]');
@@ -2534,6 +2836,9 @@ if (departmentEditorOverlay) {
     const syncEditorFields = () => {
         normalizeEditorCode();
         syncEditorParent();
+        const isKelurahan = departmentEditorType.value === 'kelurahan';
+        departmentEditorCeremonyGroupWrap.hidden = !isKelurahan;
+        departmentEditorCeremonyGroup.required = isKelurahan;
     };
 
     const hideCurrentParentOption = (departmentId) => {
@@ -2595,6 +2900,7 @@ if (departmentEditorOverlay) {
             departmentEditorName.value = '';
             departmentEditorPhone.value = '';
             departmentEditorAddress.value = '';
+            departmentEditorCeremonyGroup.value = '';
         }
 
         syncEditorFields();
@@ -2624,6 +2930,7 @@ if (departmentEditorOverlay) {
             departmentEditorName.value = button.dataset.departmentName ?? '';
             departmentEditorPhone.value = button.dataset.departmentPhone ?? '';
             departmentEditorAddress.value = button.dataset.departmentAddress ?? '';
+            departmentEditorCeremonyGroup.value = button.dataset.departmentCeremonyGroup ?? '';
         }
 
         syncEditorFields();

@@ -32,12 +32,16 @@ class EmployeeController extends Controller
             'department_id' => ['nullable', 'integer', Rule::exists('departments', 'id')],
             'is_active' => ['nullable', Rule::in(['0', '1'])],
             'per_page' => ['nullable', 'integer', Rule::in(self::PER_PAGE_OPTIONS)],
+            'sort' => ['nullable', Rule::in(['name', 'rank', 'department', 'status'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
         ]);
         $search = trim((string) ($input['search'] ?? ''));
         $employmentStatus = $input['employment_status'] ?? null;
         $departmentId = $input['department_id'] ?? null;
         $isActive = $showArchived ? null : ($input['is_active'] ?? null);
         $perPage = (int) ($input['per_page'] ?? self::PER_PAGE_OPTIONS[0]);
+        $sort = $input['sort'] ?? null;
+        $direction = $input['direction'] ?? 'asc';
 
         return view('employees.index', [
             'employees' => Employee::query()
@@ -63,12 +67,38 @@ class EmployeeController extends Controller
                     'position',
                     'positionHistories' => fn ($query) => $query->latest('effective_on')->latest('id'),
                 ])
-                ->latest($showArchived ? 'deleted_at' : 'created_at')
+                ->when($sort, function ($query) use ($sort, $direction, $showArchived): void {
+                    if ($sort === 'rank') {
+                        $grades = array_unique(array_merge(array_keys(EmployeeRankOptions::optionsFor('PNS')), array_keys(EmployeeRankOptions::optionsFor('PPPK'))));
+                        $cases = [];
+                        $bindings = [];
+                        foreach (array_values($grades) as $index => $grade) {
+                            $cases[] = 'WHEN grade = ? THEN ?';
+                            array_push($bindings, $grade, $index);
+                        }
+                        $query->orderByRaw('CASE '.implode(' ', $cases).' ELSE 999 END '.$direction, $bindings)
+                            ->orderBy('rank_name', $direction);
+                    } elseif ($sort === 'department') {
+                        $query->orderByRaw("LOWER(COALESCE((SELECT name FROM departments WHERE departments.id = employees.department_id), (SELECT department_name FROM employee_position_histories WHERE employee_position_histories.employee_id = employees.id AND department_name IS NOT NULL AND department_name <> '' ORDER BY effective_on DESC, id DESC LIMIT 1), '')) ".$direction);
+                    } elseif ($sort === 'status') {
+                        if (! $showArchived) {
+                            $query->orderBy('is_active', $direction);
+                        }
+                    } else {
+                        $query->orderByRaw('LOWER(full_name) '.$direction);
+                    }
+                    if ($sort !== 'name') {
+                        $query->orderByRaw('LOWER(full_name) asc');
+                    }
+                    $query->orderBy('id');
+                }, fn ($query) => $query->latest($showArchived ? 'deleted_at' : 'created_at')->latest('id'))
                 ->paginate($perPage)
                 ->withQueryString(),
-            'departments' => Department::query()->orderBy('name')->get(['id', 'name']),
+            'departments' => Department::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'perPageOptions' => self::PER_PAGE_OPTIONS,
             'perPage' => $perPage,
+            'sort' => $sort,
+            'direction' => $direction,
             'filters' => [
                 'search' => $search,
                 'employment_status' => $employmentStatus,
