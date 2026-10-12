@@ -1,3 +1,20 @@
+document.querySelector('[data-copy-api-token]')?.addEventListener('click', async () => {
+    const token = document.getElementById('new-api-token');
+    const status = document.querySelector('[data-copy-api-token-status]');
+    if (!token || !status) return;
+    try {
+        await navigator.clipboard.writeText(token.textContent.trim());
+        status.textContent = 'Token berhasil disalin.';
+    } catch {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(token);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        status.textContent = 'Tidak bisa menyalin otomatis. Token sudah dipilih; tekan Ctrl+C atau Command+C.';
+    }
+});
+
 document.querySelectorAll('[data-password-toggle]').forEach((button) => {
     const input = document.getElementById(button.getAttribute('aria-controls'));
     if (!input) return;

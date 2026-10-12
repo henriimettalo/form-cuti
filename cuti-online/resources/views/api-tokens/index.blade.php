@@ -24,7 +24,9 @@
                 </div>
                 <span class="status-generated shrink-0">Tampilkan sekali</span>
             </div>
-            <code class="mt-5 block break-all rounded-xl bg-slate-950 px-4 py-3 font-mono text-xs leading-6 text-slate-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]">{{ $plainTextToken }}</code>
+            <code id="new-api-token" class="mt-5 block break-all rounded-xl bg-slate-950 px-4 py-3 font-mono text-xs leading-6 text-slate-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]">{{ $plainTextToken }}</code>
+            <button class="btn-primary mt-3" type="button" data-copy-api-token>Salin token</button>
+            <p class="mt-2 text-sm text-slate-600" data-copy-api-token-status role="status"></p>
         </section>
     @endif
 

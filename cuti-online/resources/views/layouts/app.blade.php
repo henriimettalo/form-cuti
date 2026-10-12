@@ -173,7 +173,7 @@
                             }
                         @endphp
 
-                        @if (session('status'))
+                        @if (session('status') && ! session('apiTokenPlainText'))
                             <dialog class="import-confirmation" data-status-dialog aria-labelledby="status-dialog-title" aria-describedby="status-dialog-message">
                                 <div class="flex items-start justify-between gap-6">
                                     <div><h2 id="status-dialog-title" class="text-lg font-semibold text-slate-900">Berhasil</h2><p id="status-dialog-message" class="mt-2 text-sm text-slate-600">{{ session('status') }}</p></div>
