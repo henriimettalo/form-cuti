@@ -40,9 +40,13 @@
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m3 13 9-9 9 9M5 11v9a1 1 0 0 0 1 1h3v-6h6v6h3a1 1 0 0 0 1-1v-9" /></svg>
                         Dashboard
                     </a>
-                    <a class="sidebar-link {{ request()->routeIs('ceremony-schedules.*', 'counter-duty.*') ? 'sidebar-link-active' : '' }}" href="{{ route('ceremony-schedules.index', ['year' => 2026, 'tab' => 'kalender']) }}" data-workspace-link data-workspace-title="Jadwal Kegiatan">
+                    <a class="sidebar-link {{ request()->routeIs('ceremony-schedules.*') ? 'sidebar-link-active' : '' }}" href="{{ route('ceremony-schedules.index', ['year' => 2026, 'tab' => 'kalender']) }}" data-workspace-link data-workspace-title="Jadwal Upacara">
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 3v4m8-4v4M3 10h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm3 9h2m4 0h2m-8 4h2" /></svg>
-                        Jadwal Kegiatan
+                        Jadwal Upacara
+                    </a>
+                    <a class="sidebar-link {{ request()->routeIs('counter-duty.*') ? 'sidebar-link-active' : '' }}" href="{{ route('counter-duty.index') }}" data-workspace-link data-workspace-title="Jadwal Piket Loket">
+                        <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 3v4m8-4v4M3 10h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm3 9h2m4 0h2m-8 4h2" /></svg>
+                        Jadwal Piket Loket
                     </a>
                     <a class="sidebar-link {{ request()->routeIs('holidays.*') ? 'sidebar-link-active' : '' }}" href="{{ route('holidays.index') }}" data-workspace-link data-workspace-title="Hari Libur">
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v4m8-4v4M4 9h16M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm3 9h.01m3 0h.01m3 0h.01m-6 4h.01m3 0h.01m3 0h.01" /></svg>
@@ -62,6 +66,10 @@
                         Payroll Bulanan
                     </a>
                     @endif
+                    <a class="sidebar-link" href="{{ route('public-schedules.index') }}" target="_blank" rel="noopener" aria-label="Jadwal Publik (buka di tab baru)">
+                        <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 3v4m8-4v4M3 10h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" /></svg>
+                        Jadwal Publik
+                    </a>
                     <p class="sidebar-section mt-4">Layanan cuti</p>
                     <a class="sidebar-link {{ request()->routeIs('leave-requests.*') ? 'sidebar-link-active' : '' }}" href="{{ route('leave-requests.index') }}" data-workspace-link data-workspace-title="Formulir Cuti">
                         <svg aria-hidden="true" class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
@@ -146,12 +154,6 @@
                     </div>
 
                     <section id="workspace-panel-initial" role="tabpanel" aria-labelledby="workspace-tab-initial" data-workspace-panel data-workspace-static-panel>
-                        @if (session('status'))
-                            <div class="mb-6 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 shadow-[inset_0_0_0_1px_rgba(5,150,105,0.16)]">
-                                {{ session('status') }}
-                            </div>
-                        @endif
-
                         @php
                             $errorMessages = [];
 
@@ -170,6 +172,16 @@
                                 $errorMessages = collect($errors)->flatten()->all();
                             }
                         @endphp
+
+                        @if (session('status'))
+                            <dialog class="import-confirmation" data-status-dialog aria-labelledby="status-dialog-title" aria-describedby="status-dialog-message">
+                                <div class="flex items-start justify-between gap-6">
+                                    <div><h2 id="status-dialog-title" class="text-lg font-semibold text-slate-900">Berhasil</h2><p id="status-dialog-message" class="mt-2 text-sm text-slate-600">{{ session('status') }}</p></div>
+                                    <button class="text-slate-400 hover:text-slate-700" type="button" data-status-dialog-close aria-label="Tutup">×</button>
+                                </div>
+                                <button class="btn-primary mt-5" type="button" data-status-dialog-close data-status-dialog-redirect="{{ session('status_redirect') }}">OK</button>
+                            </dialog>
+                        @endif
 
                         @if ($errorMessages !== [])
                             <div class="mb-6 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-800 shadow-[inset_0_0_0_1px_rgba(225,29,72,0.14)]">

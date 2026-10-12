@@ -28,11 +28,11 @@ return [
         ],
         'ceremony-schedules:read' => [
             'label' => 'Baca jadwal apel',
-            'description' => 'Melihat jadwal apel dan upacara melalui API.',
+            'description' => 'Melihat jadwal apel/upacara dan pesan reminder berdasarkan tanggal melalui API.',
         ],
         'counter-duty-schedules:read' => [
             'label' => 'Baca jadwal piket',
-            'description' => 'Melihat daftar petugas piket loket melalui API.',
+            'description' => 'Melihat jadwal piket kecamatan serta reminder piket kecamatan dan kelurahan berdasarkan tanggal melalui API.',
         ],
     ],
 

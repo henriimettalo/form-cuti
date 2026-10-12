@@ -29,4 +29,13 @@ Route::prefix('v1')
         Route::get('/counter-duty-schedules', [ScheduleController::class, 'counterDuty'])
             ->middleware('abilities:counter-duty-schedules:read')
             ->name('api.v1.counter-duty-schedules.index');
+        Route::get('/counter-duty-schedules/reminder', [ScheduleController::class, 'counterDutyReminder'])
+            ->middleware('abilities:counter-duty-schedules:read')
+            ->name('api.v1.counter-duty-schedules.reminder');
+        Route::get('/ceremony-schedules/reminder', [ScheduleController::class, 'ceremonyReminder'])
+            ->middleware('abilities:ceremony-schedules:read')
+            ->name('api.v1.ceremony-schedules.reminder');
+        Route::get('/kelurahan-duty-schedules/reminder', [ScheduleController::class, 'kelurahanReminder'])
+            ->middleware('abilities:counter-duty-schedules:read')
+            ->name('api.v1.kelurahan-duty-schedules.reminder');
     });

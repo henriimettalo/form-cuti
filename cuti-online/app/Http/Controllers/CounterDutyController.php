@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\CeremonySchedule;
+use App\Models\Department;
 use App\Models\DutyGroup;
 use App\Models\DutyHoliday;
 use App\Models\Employee;
+use App\Models\KelurahanDutySchedule;
 use App\Services\CounterDutyScheduleService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -24,6 +26,213 @@ class CounterDutyController extends Controller
         return $this->index($request);
     }
 
+    public function kelurahanCalendar(Request $request): View
+    {
+        $filters = $request->validate(['month' => ['nullable', 'date_format:Y-m']]);
+        $month = CarbonImmutable::createFromFormat('!Y-m', $filters['month'] ?? now('Asia/Pontianak')->format('Y-m'), 'Asia/Pontianak');
+
+        return view('counter-duty.kelurahan-calendar', [
+            'month' => $month,
+            'today' => CarbonImmutable::today('Asia/Pontianak'),
+            'kelurahans' => Department::query()->where('department_type', 'kelurahan')->where('is_active', true)->orderBy('name')->get(),
+            'groups' => KelurahanDutySchedule::query()->whereNull('event_date')->orderBy('group_number')->orderBy('id')->get()->groupBy('department_id'),
+            'schedules' => KelurahanDutySchedule::query()->with('department')
+                ->where(function ($query) use ($month): void {
+                    $query->whereNull('event_date')
+                        ->orWhereBetween('event_date', [$month->toDateString(), $month->endOfMonth()->toDateString()]);
+                })
+                ->orderBy('event_date')->orderBy('id')->get()
+                ->filter(fn (KelurahanDutySchedule $schedule) => $schedule->event_date !== null)
+                ->groupBy(fn (KelurahanDutySchedule $schedule) => $schedule->event_date->toDateString()),
+            'canManage' => $request->user()->isSuperAdmin(),
+        ]);
+    }
+
+    public function kelurahanAssignments(Request $request): View
+    {
+        return view('counter-duty.kelurahan-assignments', [
+            'kelurahans' => Department::query()->where('department_type', 'kelurahan')->where('is_active', true)->orderBy('name')->get(),
+            'schedules' => KelurahanDutySchedule::query()->with('department')
+                ->whereNull('event_date')
+                ->orderBy('event_date')->orderBy('id')->get(),
+        ]);
+    }
+
+    public function rotateKelurahanCalendar(Request $request): RedirectResponse
+    {
+        $this->ensureCanManage($request);
+        $today = CarbonImmutable::today('Asia/Pontianak');
+        $input = $request->validate([
+            'event_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:'.$today->toDateString()],
+            'department_id' => ['required', 'integer', Rule::exists('departments', 'id')->where(fn ($query) => $query->where('department_type', 'kelurahan')->where('is_active', true))],
+            'group_id' => ['required', 'integer'],
+        ]);
+        $anchor = CarbonImmutable::parse($input['event_date'], 'Asia/Pontianak');
+        $firstEditableDate = $anchor->startOfMonth()->max($today);
+
+        DB::transaction(function () use ($input, $anchor, $firstEditableDate, $request): void {
+            Department::query()->whereKey($input['department_id'])->lockForUpdate()->firstOrFail();
+            $groups = KelurahanDutySchedule::query()->where('department_id', $input['department_id'])
+                ->whereNull('event_date')->orderBy('group_number')->orderBy('id')->lockForUpdate()->get();
+            $anchorIndex = $groups->search(fn (KelurahanDutySchedule $group) => $group->id === (int) $input['group_id']);
+            if ($anchorIndex === false) {
+                throw ValidationException::withMessages(['group_id' => 'Pilih kelompok yang tersedia di kelurahan ini.']);
+            }
+
+            KelurahanDutySchedule::query()->where('department_id', $input['department_id'])
+                ->whereBetween('event_date', [$firstEditableDate->toDateString(), $anchor->endOfMonth()->toDateString()])->delete();
+            foreach (range($firstEditableDate->day, $anchor->daysInMonth) as $dayNumber) {
+                $offset = $anchorIndex + $dayNumber - $anchor->day;
+                $group = $groups[(($offset % $groups->count()) + $groups->count()) % $groups->count()];
+                KelurahanDutySchedule::query()->create([
+                    'department_id' => $input['department_id'],
+                    'event_date' => $anchor->startOfMonth()->addDays($dayNumber - 1)->toDateString(),
+                    'group_number' => $group->group_number,
+                    'coordinator' => $group->coordinator,
+                    'members' => $group->members,
+                    'created_by' => $request->user()->id,
+                ]);
+            }
+        });
+
+        return to_route('counter-duty.kelurahan-calendar', ['month' => $anchor->format('Y-m')])
+            ->with('status', 'Rotasi kelompok kelurahan berhasil disimpan. Jadwal tanggal yang sudah lewat tidak diubah.');
+    }
+
+    public function createKelurahanSchedule(Request $request): View
+    {
+        $filters = $request->validate([
+            'month' => ['nullable', 'date_format:Y-m'],
+            'department_id' => ['required', 'integer', Rule::exists('departments', 'id')->where(fn ($query) => $query->where('department_type', 'kelurahan')->where('is_active', true))],
+            'group_number' => ['required', 'integer', 'between:1,255'],
+        ]);
+        $month = CarbonImmutable::createFromFormat('!Y-m', $filters['month'] ?? now('Asia/Pontianak')->format('Y-m'), 'Asia/Pontianak');
+
+        return view('counter-duty.kelurahan-schedule-form', [
+            'month' => $month,
+            'kelurahans' => Department::query()->where('department_type', 'kelurahan')->where('is_active', true)->orderBy('name')->get(),
+            'employees' => Employee::query()->where('is_active', true)->where('department_id', $filters['department_id'])->orderBy('full_name')->get(['id', 'department_id', 'full_name']),
+            'selectedDepartmentId' => $filters['department_id'] ?? null,
+            'selectedGroupNumber' => $filters['group_number'] ?? null,
+            'selectedDepartment' => Department::query()->findOrFail($filters['department_id']),
+        ]);
+    }
+
+    public function editKelurahanSchedule(Request $request, KelurahanDutySchedule $kelurahanDutySchedule): View
+    {
+        $this->ensureCanManage($request);
+        return view('counter-duty.kelurahan-schedule-form', [
+            'month' => CarbonImmutable::now('Asia/Pontianak'),
+            'kelurahans' => collect([$kelurahanDutySchedule->department]),
+            'employees' => Employee::query()->where('is_active', true)->where('department_id', $kelurahanDutySchedule->department_id)->orderBy('full_name')->get(['id', 'department_id', 'full_name']),
+            'selectedDepartmentId' => $kelurahanDutySchedule->department_id,
+            'selectedGroupNumber' => $kelurahanDutySchedule->group_number,
+            'selectedDepartment' => $kelurahanDutySchedule->department,
+            'schedule' => $kelurahanDutySchedule,
+        ]);
+    }
+
+    public function updateKelurahanSchedule(Request $request, KelurahanDutySchedule $kelurahanDutySchedule): RedirectResponse
+    {
+        $this->ensureCanManage($request);
+        $input = $request->validate([
+            'coordinator_employee_id' => ['required', 'integer', 'exists:employees,id'],
+            'member_employee_ids' => ['required', 'array', 'min:1', 'max:20'],
+            'member_employee_ids.*' => ['integer', 'distinct', 'exists:employees,id'],
+        ]);
+        if (in_array((int) $input['coordinator_employee_id'], array_map('intval', $input['member_employee_ids']), true)) {
+            throw ValidationException::withMessages(['member_employee_ids' => 'Penanggung jawab tidak boleh dipilih sebagai anggota.']);
+        }
+        $ids = array_values(array_unique([(int) $input['coordinator_employee_id'], ...array_map('intval', $input['member_employee_ids'])]));
+        $employees = Employee::query()->whereIn('id', $ids)->where('is_active', true)->where('department_id', $kelurahanDutySchedule->department_id)->get(['id', 'full_name'])->keyBy('id');
+        if ($employees->count() !== count($ids)) throw ValidationException::withMessages(['coordinator_employee_id' => 'Pilih pegawai aktif dari kelurahan yang sama.']);
+        $kelurahanDutySchedule->update(['coordinator' => $employees[(int) $input['coordinator_employee_id']]->full_name, 'members' => collect($input['member_employee_ids'])->map(fn ($id) => $employees[(int) $id]->full_name)->values()->all()]);
+        return to_route('counter-duty.kelurahan-assignments')->with('status', 'Kelompok '.$kelurahanDutySchedule->group_number.' '.$kelurahanDutySchedule->department->name.' berhasil diperbarui.');
+    }
+
+    public function destroyKelurahanSchedule(Request $request, KelurahanDutySchedule $kelurahanDutySchedule): RedirectResponse
+    {
+        $this->ensureCanManage($request);
+        $label = 'Kelompok '.$kelurahanDutySchedule->group_number.' '.$kelurahanDutySchedule->department->name;
+        $kelurahanDutySchedule->delete();
+        return to_route('counter-duty.kelurahan-assignments')->with('status', $label.' berhasil dihapus.');
+    }
+
+    public function storeKelurahanSchedule(Request $request): RedirectResponse
+    {
+        $this->ensureCanManage($request);
+        $input = $request->validate([
+            'department_id' => ['required', 'integer', Rule::exists('departments', 'id')->where(fn ($query) => $query->where('department_type', 'kelurahan')->where('is_active', true))],
+            'event_date' => ['nullable', 'date'],
+            'group_number' => ['required', 'integer', 'between:1,255'],
+            'coordinator_employee_id' => ['required', 'integer', 'exists:employees,id'],
+            'member_employee_ids' => ['required', 'array', 'min:1', 'max:20'],
+            'member_employee_ids.*' => ['integer', 'distinct', 'exists:employees,id'],
+        ]);
+        $employeeIds = array_values(array_unique([(int) $input['coordinator_employee_id'], ...array_map('intval', $input['member_employee_ids'])]));
+        if (in_array((int) $input['coordinator_employee_id'], array_map('intval', $input['member_employee_ids']), true)) {
+            throw ValidationException::withMessages(['member_employee_ids' => 'Penanggung jawab tidak boleh dipilih sebagai anggota.']);
+        }
+        if (KelurahanDutySchedule::query()->where('department_id', $input['department_id'])->where('group_number', $input['group_number'])->whereNull('event_date')->exists()) {
+            throw ValidationException::withMessages(['group_number' => 'Kelompok tersebut sudah dibuat untuk kelurahan ini.']);
+        }
+        $employees = Employee::query()->whereIn('id', $employeeIds)->where('is_active', true)->get(['id', 'department_id', 'full_name'])->keyBy('id');
+        if ($employees->count() !== count($employeeIds) || $employees->contains(fn (Employee $employee) => (int) $employee->department_id !== (int) $input['department_id'])) {
+            throw ValidationException::withMessages(['coordinator_employee_id' => 'Pilih pegawai aktif yang berasal dari kelurahan tersebut.']);
+        }
+        $coordinator = $employees[(int) $input['coordinator_employee_id']]->full_name;
+        $members = collect($input['member_employee_ids'])->map(fn ($id) => $employees[(int) $id]->full_name)->values()->all();
+        KelurahanDutySchedule::query()->create([
+            'department_id' => $input['department_id'], 'event_date' => $input['event_date'] ?? null, 'group_number' => $input['group_number'],
+            'coordinator' => $coordinator, 'members' => $members, 'created_by' => $request->user()->id,
+        ]);
+
+        $department = Department::query()->findOrFail($input['department_id']);
+        return to_route('counter-duty.kelurahan-schedules.create', [
+            'month' => $request->input('month', now('Asia/Pontianak')->format('Y-m')),
+            'department_id' => $input['department_id'],
+            'group_number' => $input['group_number'],
+        ])->with('status', 'Kelompok '.$input['group_number'].' '.$department->name.' berhasil dibuat. Tanggal dapat ditentukan pada tahap penjadwalan.')
+            ->with('status_redirect', route('counter-duty.kelurahan-assignments', ['month' => $request->input('month', now('Asia/Pontianak')->format('Y-m'))]));
+    }
+
+    public function updateKelurahanAssignment(Request $request, CeremonySchedule $ceremonySchedule): RedirectResponse
+    {
+        $this->ensureCanManage($request);
+        abort_unless($ceremonySchedule->type === 'piket_loket', 404);
+
+        $input = $request->validate([
+            'department_id' => ['required', 'integer', Rule::exists('departments', 'id')->where(fn ($query) => $query->where('department_type', 'kelurahan')->where('is_active', true))],
+        ]);
+        $ceremonySchedule->update(['department_id' => $input['department_id']]);
+
+        return to_route('counter-duty.kelurahan-assignments', ['month' => $ceremonySchedule->event_date->format('Y-m')])
+            ->with('status', 'Petugas kelurahan untuk jadwal '.$ceremonySchedule->event_date->format('d/m/Y').' berhasil diatur.');
+    }
+
+    public function updateKelurahanRoster(Request $request, Department $department): RedirectResponse
+    {
+        $this->ensureCanManage($request);
+        abort_unless($department->department_type === 'kelurahan', 404);
+
+        $input = $request->validate([
+            'duty_coordinator' => ['required', 'string', 'max:255'],
+            'duty_members' => ['required', 'string', 'max:5000'],
+        ], [], ['duty_coordinator' => 'penanggung jawab', 'duty_members' => 'anggota']);
+        $members = array_values(array_filter(array_map('trim', preg_split('/\R/u', $input['duty_members']))));
+        if ($members === [] || count($members) > 20 || count($members) !== count(array_unique($members)) || in_array(trim($input['duty_coordinator']), $members, true)) {
+            throw ValidationException::withMessages(['duty_members' => 'Isi 1–20 anggota yang berbeda. Penanggung jawab tidak perlu diulang.']);
+        }
+
+        $department->update([
+            'duty_coordinator' => trim($input['duty_coordinator']),
+            'duty_members' => $members,
+        ]);
+
+        return to_route('counter-duty.kelurahan-assignments', ['month' => $request->input('month', now('Asia/Pontianak')->format('Y-m'))])
+            ->with('status', 'Susunan petugas '.$department->name.' berhasil disimpan.');
+    }
+
     public function index(Request $request): View
     {
         $filters = $request->validate([
@@ -35,6 +244,10 @@ class CounterDutyController extends Controller
         ]);
         $month = CarbonImmutable::createFromFormat('!Y-m', $filters['month'] ?? now('Asia/Pontianak')->format('Y-m'), 'Asia/Pontianak');
         $year = (int) ($filters['year'] ?? $month->year);
+
+        if (! isset($filters['tab'])) {
+            return view('counter-duty.choose', ['month' => $month]);
+        }
 
         return view('counter-duty.index', [
             'tab' => $filters['tab'] ?? 'agenda',

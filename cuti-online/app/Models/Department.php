@@ -22,7 +22,8 @@ class Department extends Model
         'address',
         'phone',
         'is_active',
-        'ceremony_group_number',
+        'duty_coordinator',
+        'duty_members',
         'ceremony_group_number',
     ];
 
@@ -31,7 +32,7 @@ class Department extends Model
         return [
             'is_active' => 'boolean',
             'parent_department_id' => 'integer',
-            'ceremony_group_number' => 'integer',
+            'duty_members' => 'array',
             'ceremony_group_number' => 'integer',
         ];
     }

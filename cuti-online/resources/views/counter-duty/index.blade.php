@@ -15,27 +15,29 @@
         @endunless
     </div>
     @unless ($standaloneHolidayPage)
-    <nav class="mt-7 flex flex-wrap gap-2" aria-label="Pengaturan piket loket">
+    <div class="mt-7 flex flex-wrap items-center justify-between gap-3">
+    <nav class="flex flex-wrap gap-2" aria-label="Pengaturan piket loket">
         @foreach (['agenda' => 'Jadwal piket', 'groups' => 'Kelompok piket'] as $value => $label)
             <a class="{{ $tab === $value ? 'btn-primary' : 'btn-secondary' }}" href="{{ route('counter-duty.index', ['tab' => $value, 'month' => $month->format('Y-m'), 'year' => $year]) }}" @if ($tab === $value) aria-current="page" @endif>{{ $label }}</a>
         @endforeach
     </nav>
+    @if ($canManage && $tab === 'agenda')
+        <a class="btn-primary ml-auto whitespace-nowrap" href="{{ route('counter-duty.generate') }}">Buat jadwal otomatis</a>
+    @endif
+    </div>
     @endunless
 
     @if ($tab === 'agenda')
         <section class="card mt-5">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <h2 class="section-heading">Piket {{ $month->locale('id')->translatedFormat('F Y') }}</h2>
-                @if ($canManage)
-                    <div class="flex flex-wrap gap-2">
-                        <a class="btn-primary" href="{{ route('counter-duty.generate') }}">Buat jadwal otomatis</a>
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 class="section-heading">Piket {{ $month->locale('id')->translatedFormat('F Y') }}</h2>
                     </div>
-                @endif
             </div>
             <form class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between" action="{{ route('counter-duty.index') }}" method="GET">
                 <a class="btn-secondary" href="{{ route('counter-duty.index', ['tab' => 'agenda', 'month' => $month->subMonth()->format('Y-m'), 'year' => $year]) }}" aria-label="Lihat {{ $month->subMonth()->locale('id')->translatedFormat('F Y') }}">Bulan sebelumnya</a>
                 <div class="min-w-0 sm:w-56 sm:flex-none">
-                    <label class="form-label" for="month-trigger">Bulan dan tahun</label>
+                    <label class="sr-only" for="month-trigger">Bulan dan tahun</label>
                     <x-month-picker id="month" name="month" value="{{ $month->format('Y-m') }}" :years="range(2026, 2030)" :auto-submit="true" />
                 </div>
                 <a class="btn-secondary" href="{{ route('counter-duty.index', ['tab' => 'agenda', 'month' => $month->addMonth()->format('Y-m'), 'year' => $year]) }}" aria-label="Lihat {{ $month->addMonth()->locale('id')->translatedFormat('F Y') }}">Bulan berikutnya</a>
@@ -57,9 +59,8 @@
                                     @foreach ($week as $day)
                                         @php($dateKey = $day['date']->toDateString())
                                         @php($schedule = $day['inMonth'] ? $monthSchedules->get($dateKey) : null)
-                                        <div class="min-h-32 min-w-0 p-2 {{ $day['inMonth'] ? 'bg-white' : 'bg-slate-50 text-slate-400' }}">
+                                        <div class="min-h-32 min-w-0 p-2 {{ $day['inMonth'] ? 'bg-white' : 'bg-slate-50 text-slate-400' }}" @if ($day['inMonth'] && $dateKey === now('Asia/Pontianak')->toDateString()) data-calendar-today tabindex="-1" @endif>
                                             <div class="flex items-start justify-between gap-1"><span class="grid size-7 shrink-0 place-items-center rounded-full text-sm {{ $schedule ? 'bg-sky-100 font-semibold text-sky-800' : 'font-medium text-slate-600' }}">{{ $day['date']->format('j') }}</span>
-                                                @if ($schedule && $canManage)<a class="text-xs font-medium text-sky-700 underline decoration-slate-300 underline-offset-2" href="{{ route('ceremony-schedules.edit', $schedule) }}" aria-label="Edit piket {{ $day['date']->format('d/m/Y') }}">Edit</a>@endif
                                             </div>
                                             @if ($schedule)
                                                 <div class="mt-2 space-y-1.5 text-xs leading-4">

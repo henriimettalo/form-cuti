@@ -27,6 +27,7 @@ Route::middleware('guest')->group(function (): void {
 });
 
 Route::get('/jadwal-publik', [PublicScheduleController::class, 'index'])->name('public-schedules.index');
+Route::get('/jadwal-publik/piket-kelurahan', [PublicScheduleController::class, 'kelurahan'])->name('public-schedules.kelurahan');
 
 Route::middleware('auth')->group(function (): void {
     Route::middleware('role:super_admin,admin_unit,pengguna')->group(function (): void {
@@ -34,6 +35,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/jadwal-apel-upacara', [CeremonyScheduleController::class, 'index'])->name('ceremony-schedules.index');
         Route::put('/jadwal-apel-upacara/kalender', [CeremonyScheduleController::class, 'updateCalendar'])->middleware('role:super_admin')->name('ceremony-schedules.calendar');
         Route::get('/jadwal-piket-loket', [CounterDutyController::class, 'index'])->name('counter-duty.index');
+        Route::get('/jadwal-piket-loket/kalender-kelurahan', [CounterDutyController::class, 'kelurahanCalendar'])->name('counter-duty.kelurahan-calendar');
         Route::get('/hari-libur', [CounterDutyController::class, 'holidays'])->name('holidays.index');
 
         Route::get('/formulir-cuti', [LeaveRequestController::class, 'index'])->name('leave-requests.index');
@@ -62,6 +64,15 @@ Route::middleware('auth')->group(function (): void {
         Route::put('/jadwal-piket-loket/kalender-libur', [CounterDutyController::class, 'updateCalendar'])->name('counter-duty.holidays.calendar');
         Route::delete('/jadwal-piket-loket/libur/{dutyHoliday}', [CounterDutyController::class, 'destroyHoliday'])->name('counter-duty.holidays.destroy');
         Route::get('/jadwal-piket-loket/buat', [CounterDutyController::class, 'generate'])->name('counter-duty.generate');
+        Route::get('/jadwal-piket-loket/atur-kelurahan', [CounterDutyController::class, 'kelurahanAssignments'])->name('counter-duty.kelurahan-assignments');
+        Route::put('/jadwal-piket-loket/kalender-kelurahan', [CounterDutyController::class, 'rotateKelurahanCalendar'])->name('counter-duty.kelurahan-calendar.rotate');
+        Route::get('/jadwal-piket-loket/atur-kelurahan/tambah', [CounterDutyController::class, 'createKelurahanSchedule'])->name('counter-duty.kelurahan-schedules.create');
+        Route::get('/jadwal-piket-loket/atur-kelurahan/kelompok/{kelurahanDutySchedule}/edit', [CounterDutyController::class, 'editKelurahanSchedule'])->name('counter-duty.kelurahan-schedules.edit');
+        Route::put('/jadwal-piket-loket/atur-kelurahan/kelompok/{kelurahanDutySchedule}', [CounterDutyController::class, 'updateKelurahanSchedule'])->name('counter-duty.kelurahan-schedules.update');
+        Route::delete('/jadwal-piket-loket/atur-kelurahan/kelompok/{kelurahanDutySchedule}', [CounterDutyController::class, 'destroyKelurahanSchedule'])->name('counter-duty.kelurahan-schedules.destroy');
+        Route::put('/jadwal-piket-loket/atur-kelurahan/{ceremonySchedule}', [CounterDutyController::class, 'updateKelurahanAssignment'])->name('counter-duty.kelurahan-assignments.update');
+        Route::put('/jadwal-piket-loket/petugas-kelurahan/{department}', [CounterDutyController::class, 'updateKelurahanRoster'])->name('counter-duty.kelurahan-roster.update');
+        Route::post('/jadwal-piket-loket/jadwal-kelurahan', [CounterDutyController::class, 'storeKelurahanSchedule'])->name('counter-duty.kelurahan-schedules.store');
         Route::post('/jadwal-piket-loket/pratinjau', [CounterDutyController::class, 'preview'])->name('counter-duty.preview');
         Route::post('/jadwal-piket-loket/simpan', [CounterDutyController::class, 'store'])->name('counter-duty.store');
         Route::post('/jadwal-piket-loket/batal', [CounterDutyController::class, 'cancel'])->name('counter-duty.cancel');

@@ -297,6 +297,50 @@ if (dutyGroupCreateDialog) {
 const isWorkspaceFrame = document.documentElement.dataset.workspaceFrame === 'true';
 const isImportModalFrame = window.frameElement?.hasAttribute('data-import-modal-frame') === true;
 
+if (!isWorkspaceFrame && !isImportModalFrame) {
+    const backToTop = document.createElement('button');
+    backToTop.type = 'button';
+    backToTop.className = 'back-to-top';
+    backToTop.textContent = '↑ Back to top';
+    backToTop.setAttribute('aria-label', 'Kembali ke atas halaman');
+    backToTop.hidden = true;
+    document.body.append(backToTop);
+
+    const updateBackToTop = () => {
+        const frames = document.querySelectorAll('iframe[data-workspace-frame]');
+        const frameScrolled = Array.from(frames).some((frame) => {
+            if (!frame.getClientRects().length) return false;
+            try {
+                return frame.contentWindow.scrollY > 300;
+            } catch {
+                return false;
+            }
+        });
+        backToTop.hidden = window.scrollY <= 300 && !frameScrolled;
+    };
+
+    window.addEventListener('scroll', updateBackToTop, { passive: true });
+    document.addEventListener('load', (event) => {
+        if (!event.target.matches?.('iframe[data-workspace-frame]')) return;
+        try {
+            event.target.contentWindow.addEventListener('scroll', updateBackToTop, { passive: true });
+        } catch {}
+        updateBackToTop();
+    }, true);
+
+    backToTop.addEventListener('click', () => {
+        const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
+        window.scrollTo({ top: 0, behavior });
+        document.querySelectorAll('iframe[data-workspace-frame]').forEach((frame) => {
+            if (!frame.getClientRects().length) return;
+            try {
+                frame.contentWindow.scrollTo({ top: 0, behavior });
+            } catch {}
+        });
+    });
+    updateBackToTop();
+}
+
 if (!isWorkspaceFrame) {
     const stickyTitle = document.createElement('div');
     stickyTitle.className = 'sticky-page-title';
@@ -367,6 +411,33 @@ if (!isWorkspaceFrame) {
     scheduleTitleUpdate();
 }
 
+document.querySelectorAll('form[method]:not([data-no-confirm])').forEach((form) => {
+    const method = form.getAttribute('method')?.toLowerCase();
+    const action = form.getAttribute('action') ?? '';
+    if (method === 'get' || action.endsWith('/login') || action.endsWith('/logout')) return;
+    if (!form.hasAttribute('data-confirm-title')) {
+        form.dataset.confirmTitle = 'Konfirmasi perubahan';
+        form.dataset.confirmMessage = 'Periksa kembali data yang diisi sebelum menyimpan perubahan.';
+        form.dataset.confirmButton = 'Lanjutkan';
+    }
+    const destructive = form.querySelector('input[name="_method"][value="DELETE" i]') || /(?:destroy|delete|hapus)/i.test(action);
+    if (destructive && !form.hasAttribute('data-confirm-title')) {
+        form.dataset.confirmTitle = 'Hapus data?';
+        form.dataset.confirmMessage = 'Data yang dihapus tidak dapat digunakan lagi. Periksa kembali sebelum melanjutkan.';
+        form.dataset.confirmButton = 'Hapus';
+    }
+});
+
+document.querySelectorAll('a[href]:not([data-no-confirm])').forEach((link) => {
+    const href = link.getAttribute('href') ?? '';
+    const label = link.textContent?.trim() ?? '';
+    if (/(?:\/edit(?:[/?#]|$)|\bedit\b)/i.test(href) || /^edit$/i.test(label)) {
+        link.dataset.confirmTitle = 'Edit data?';
+        link.dataset.confirmMessage = 'Anda akan membuka form edit. Perubahan belum disimpan sampai form dikirim.';
+        link.dataset.confirmButton = 'Buka form edit';
+    }
+});
+
 if (document.querySelector('[data-confirm-title]')) {
     const dialog = document.createElement('dialog');
     dialog.className = 'import-confirmation';
@@ -400,12 +471,32 @@ if (document.querySelector('[data-confirm-title]')) {
         dialog.showModal();
         backButton.focus();
     });
+    document.addEventListener('click', (event) => {
+        const link = event.target.closest?.('a[data-confirm-title]');
+        if (!link) return;
+        event.preventDefault();
+        pendingForm = null;
+        pendingSubmitter = link;
+        dialog.querySelector('#action-confirmation-title').textContent = link.dataset.confirmTitle;
+        dialog.querySelector('#action-confirmation-description').textContent = link.dataset.confirmMessage ?? '';
+        confirmButton.textContent = link.dataset.confirmButton ?? 'Lanjutkan';
+        dialog.showModal();
+        backButton.focus();
+    });
     backButton.addEventListener('click', () => dialog.close());
     dialog.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') event.stopPropagation();
     });
     dialog.addEventListener('close', () => pendingSubmitter?.focus());
     confirmButton.addEventListener('click', () => {
+        if (!pendingForm && pendingSubmitter?.matches?.('a[data-confirm-title]')) {
+            const href = pendingSubmitter.href;
+            pendingForm = null;
+            pendingSubmitter = null;
+            dialog.close();
+            window.location.href = href;
+            return;
+        }
         if (!pendingForm) return;
         const form = pendingForm;
         const submitter = pendingSubmitter;
@@ -679,7 +770,7 @@ if (isWorkspaceFrame) {
 
         const height = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
 
-        window.parent.postMessage({ type: 'simpeg-workspace-frame-height', height }, window.location.origin);
+        window.parent.postMessage({ type: 'simpeg-workspace-frame-height', height, publicLayout: document.body.hasAttribute('data-public-layout') }, window.location.origin);
     };
 
     const scheduleWorkspaceFrameHeight = () => {
@@ -1015,7 +1106,9 @@ if (workspaceRoot && !isWorkspaceFrame) {
             }
 
             const viewportHeight = window.innerHeight;
-            const cappedHeight = Math.max(608, Math.min(viewportHeight, Math.ceil(height)));
+            const cappedHeight = event.data.publicLayout
+                ? Math.max(608, Math.ceil(height))
+                : Math.max(608, Math.min(viewportHeight, Math.ceil(height)));
 
             frame.style.height = `${cappedHeight}px`;
         });
@@ -3108,4 +3201,14 @@ document.querySelectorAll('[data-import-managed]').forEach((section) => {
 
         lockField(control);
     });
+});
+
+document.querySelectorAll('[data-status-dialog]').forEach((dialog) => {
+    dialog.showModal();
+    const close = (event) => {
+        const redirect = event.currentTarget?.dataset.statusDialogRedirect;
+        dialog.close();
+        if (redirect) window.location.href = redirect;
+    };
+    dialog.querySelectorAll('[data-status-dialog-close]').forEach((button) => button.addEventListener('click', close));
 });

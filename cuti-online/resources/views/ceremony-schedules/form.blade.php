@@ -53,10 +53,10 @@
                 @error('event_date') <p class="form-error">{{ $message }}</p> @enderror
             </div>
             <div class="min-w-0">
-                <label class="form-label" for="department_id">{{ $isCounterDuty ? 'Unit petugas (opsional)' : 'Kelurahan petugas (ditentukan otomatis)' }}</label>
+                <label class="form-label" for="department_id">{{ $isCounterDuty ? 'Kelurahan petugas (opsional)' : 'Kelurahan petugas (ditentukan otomatis)' }}</label>
                 <select class="form-select" id="department_id" name="department_id">
                     <option value="">{{ $isCounterDuty ? 'Belum ditentukan' : 'Otomatis mengikuti rotasi' }}</option>
-                    @foreach ($departments as $department)
+                    @foreach ($isCounterDuty ? $kelurahans : $departments as $department)
                         <option value="{{ $department->id }}" @selected((string) old('department_id', $schedule->department_id) === (string) $department->id)>{{ $department->name }}{{ $department->is_active ? '' : ' (nonaktif)' }}</option>
                     @endforeach
                 </select>

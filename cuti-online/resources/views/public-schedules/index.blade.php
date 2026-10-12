@@ -12,11 +12,6 @@
         <span class="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">View only</span>
     </div>
 
-    <nav class="mt-6 flex flex-wrap gap-2" aria-label="Jenis jadwal publik">
-        <a class="{{ $tab === 'apel' ? 'btn-primary' : 'btn-secondary' }}" href="{{ route('public-schedules.index', ['tab' => 'apel', 'month' => $month->format('Y-m')]) }}">Apel / Upacara</a>
-        <a class="{{ $tab === 'piket' ? 'btn-primary' : 'btn-secondary' }}" href="{{ route('public-schedules.index', ['tab' => 'piket', 'month' => $month->format('Y-m')]) }}">Piket Loket</a>
-    </nav>
-
     <section class="card mt-5" aria-labelledby="public-calendar-heading">
         <div class="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -44,7 +39,8 @@
                 @foreach ($calendarWeeks as $week)
                     @foreach ($week as $day)
                         @php($dateKey = $day['date']->toDateString())
-                        @php($schedule = $day['inMonth'] ? $schedules->get($dateKey) : null)
+                        @php($daySchedules = $day['inMonth'] && $tab === 'piket' ? $schedules->get($dateKey, collect()) : collect())
+                        @php($schedule = $day['inMonth'] ? ($tab === 'piket' ? $daySchedules->first() : $schedules->get($dateKey)) : null)
                         <div class="min-h-32 border-b border-r border-slate-200 p-3 {{ $day['inMonth'] ? 'bg-white' : 'bg-slate-50 text-slate-400' }}">
                             <div class="flex items-start justify-between gap-2">
                                 <span class="grid size-7 place-items-center rounded-full text-sm {{ $schedule ? 'bg-sky-100 font-semibold text-sky-800' : 'font-medium text-slate-600' }}">{{ $day['date']->format('j') }}</span>
@@ -56,6 +52,8 @@
                                 <p class="mt-2 text-xs font-semibold text-sky-700">Kelompok {{ $schedule->ceremony_group_number ?? '-' }}</p>
                                 <p class="mt-1 line-clamp-3 text-xs text-slate-600">{{ $schedule->department?->name ?? 'Belum dipilih' }}</p>
                             @elseif ($schedule)
+                                @foreach ($daySchedules as $schedule)
+                                <div class="{{ $loop->first ? '' : 'mt-2 border-t border-slate-200 pt-2' }}">
                                 <p class="mt-2 text-xs font-semibold text-sky-700">Kelompok {{ data_get($schedule->duty_roster, 'number', $schedule->dutyGroup?->number ?? '-') }}</p>
                                 <p class="mt-1 text-xs font-semibold text-slate-700">{{ data_get($schedule->duty_roster, 'coordinator', 'Belum dipilih') }}</p>
                                 @if (data_get($schedule->duty_roster, 'members', []))
@@ -65,6 +63,8 @@
                                         @endforeach
                                     </ol>
                                 @endif
+                                </div>
+                                @endforeach
                             @endif
                         </div>
                     @endforeach

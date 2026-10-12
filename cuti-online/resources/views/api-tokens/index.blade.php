@@ -108,6 +108,23 @@
 
             <pre class="mt-5 overflow-x-auto rounded-xl bg-slate-950 p-4 font-mono text-xs leading-6 text-slate-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]"><code>curl -H "Authorization: Bearer TOKEN_ANDA" \
   "{{ $apiBaseUrl }}/employees"</code></pre>
+            <div class="mt-6 border-t border-slate-100 pt-5">
+                <h3 class="section-heading">Reminder jadwal untuk Telegram</h3>
+                <p class="section-description">Parameter date opsional (YYYY-MM-DD). Tanpa date, digunakan hari ini menurut waktu Asia/Pontianak.</p>
+                <div class="mt-4 grid gap-3 text-sm">
+                    @foreach (['ceremony-schedules' => ['Apel / Upacara', 'ceremony-schedules:read'], 'counter-duty-schedules' => ['Piket Kecamatan', 'counter-duty-schedules:read'], 'kelurahan-duty-schedules' => ['Piket Kelurahan', 'counter-duty-schedules:read']] as $endpoint => $details)
+                        <div class="rounded-xl bg-slate-50 p-4">
+                            <p class="font-semibold text-slate-800">{{ $details[0] }}</p>
+                            <code class="mt-2 block break-all">GET {{ $apiBaseUrl }}/{{ $endpoint }}/reminder?date={{ now('Asia/Pontianak')->toDateString() }}</code>
+                            <p class="mt-2 text-slate-500">Izin: <code>{{ $details[1] }}</code>.</p>
+                        </div>
+                    @endforeach
+                </div>
+                <p class="mt-4 text-sm leading-6 text-slate-600">Cek <code>isAvailable</code>: <strong>0</strong> berarti hentikan eksekusi cron saat itu; <strong>1</strong> berarti kirim field <code>message</code> tingkat atas ke Telegram sebagai teks biasa. Field <code>data</code> memuat rincian tiap jadwal. API tidak mengirim pesan ke Telegram secara langsung.</p>
+                <pre class="mt-4 overflow-x-auto rounded-xl bg-slate-950 p-4 font-mono text-xs leading-6 text-slate-100"><code>curl -H "Authorization: Bearer TOKEN_ANDA" \
+  -H "Accept: application/json" \
+  "{{ $apiBaseUrl }}/counter-duty-schedules/reminder?date={{ now('Asia/Pontianak')->toDateString() }}"</code></pre>
+            </div>
         </section>
     </div>
 
