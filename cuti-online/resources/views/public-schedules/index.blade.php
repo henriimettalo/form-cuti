@@ -9,16 +9,19 @@
             <h1 class="page-title mt-1">Jadwal kegiatan</h1>
             <p class="page-description">Lihat jadwal apel/upacara dan piket loket tanpa perlu masuk ke sistem.</p>
         </div>
-        <span class="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">View only</span>
+        <div class="flex flex-wrap items-center gap-2 print:hidden">
+            <button class="btn-secondary" type="button" data-public-print>Unduh PDF / Cetak</button>
+            <span class="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">View only</span>
+        </div>
     </div>
 
-    <section class="card mt-5" aria-labelledby="public-calendar-heading">
+    <section class="card mt-5" aria-labelledby="public-calendar-heading" data-public-calendar data-public-calendar-type="{{ $tab }}">
         <div class="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
                 <h2 class="section-heading" id="public-calendar-heading">{{ $tab === 'apel' ? 'Apel / Upacara' : 'Piket Loket' }} {{ $month->locale('id')->translatedFormat('F Y') }}</h2>
                 <p class="section-description">Jadwal yang sudah dipublikasikan oleh pengelola.</p>
             </div>
-            <div class="flex flex-wrap items-end gap-2">
+            <div class="flex flex-wrap items-end gap-2 print:hidden">
                 <a class="btn-secondary" href="{{ route('public-schedules.index', ['tab' => $tab, 'month' => $month->subMonth()->format('Y-m')]) }}" aria-label="Lihat {{ $month->subMonth()->locale('id')->translatedFormat('F Y') }}">Bulan sebelumnya</a>
                 <form method="GET" action="{{ route('public-schedules.index') }}">
                     <input type="hidden" name="tab" value="{{ $tab }}">
@@ -29,7 +32,7 @@
             </div>
         </div>
 
-        <div class="mt-5 overflow-x-auto rounded-xl border border-slate-200">
+        <div class="mt-5 overflow-x-auto rounded-xl border border-slate-200" data-public-calendar-grid>
             <div class="grid min-w-[42rem] grid-cols-7 bg-emerald-50 text-center text-xs font-semibold uppercase tracking-wide text-slate-600">
                 @foreach (['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'] as $weekday)
                     <div class="border-b border-r border-slate-200 px-2 py-3">{{ $weekday }}</div>

@@ -8,10 +8,6 @@
             <p class="page-description">{{ $standaloneHolidayPage ? 'Kalender libur bersama untuk apel/upacara dan piket loket.' : 'Jadwal bergiliran melalui semua kelompok yang tersedia. Susunan kelompok dapat ditambah sesuai kebutuhan.' }}</p>
         </div>
         @unless ($standaloneHolidayPage)
-        <nav class="flex shrink-0 flex-wrap gap-2 self-start sm:self-center" aria-label="Jenis jadwal">
-            <a class="btn-secondary" href="{{ route('ceremony-schedules.index', ['year' => 2026, 'tab' => 'kalender']) }}">Apel / Upacara</a>
-            <a class="btn-primary" href="{{ route('counter-duty.index', ['tab' => $tab, 'month' => $month->format('Y-m'), 'year' => $year]) }}" aria-current="page">Piket Loket</a>
-        </nav>
         @endunless
     </div>
     @unless ($standaloneHolidayPage)
@@ -31,7 +27,6 @@
         <section class="card mt-5">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h2 class="section-heading">Piket {{ $month->locale('id')->translatedFormat('F Y') }}</h2>
                     </div>
             </div>
             <form class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between" action="{{ route('counter-duty.index') }}" method="GET">
@@ -84,12 +79,11 @@
             <p class="section-description">Kelompok dapat berjumlah berapa pun. Perubahan otomatis diterapkan pada jadwal piket yang akan datang; jadwal yang sudah lewat tetap menjadi arsip.</p>
             @if ($canManage)
                 <datalist id="employee-names">@foreach ($employees as $employee)<option value="{{ $employee->full_name }}"></option>@endforeach</datalist>
-                <button class="btn-primary mb-5" type="button" data-duty-group-create-open>Tambah kelompok {{ $groups->count() + 1 }}</button>
                 <dialog class="m-auto max-h-[calc(100dvh-2rem)] w-[min(100%-2rem,40rem)] overflow-y-auto rounded-2xl p-0 shadow-2xl backdrop:bg-slate-950/50" data-duty-group-create-dialog aria-labelledby="duty-group-create-title">
                     <form method="POST" action="{{ route('counter-duty.groups.store') }}" class="p-6">
                         @csrf
                         <div class="flex items-start justify-between gap-4 border-b border-slate-100 pb-4"><div><h3 class="text-lg font-semibold text-slate-900" id="duty-group-create-title">Tambah kelompok {{ $groups->count() + 1 }}</h3><p class="mt-1 text-sm text-slate-600">Isi penanggung jawab dan petugas piket.</p></div><button class="btn-secondary px-3" type="button" data-duty-group-create-close aria-label="Tutup">×</button></div>
-                        <div class="mt-5 grid gap-5"><div><label class="form-label" for="new-group-coordinator">Penanggung jawab</label><input class="form-input" id="new-group-coordinator" name="coordinator" placeholder="Nama penanggung jawab" maxlength="255" required></div><div><label class="form-label" for="new-group-members">Petugas piket</label><textarea class="form-input" id="new-group-members" name="members" rows="5" placeholder="Satu petugas per baris" maxlength="5000" required></textarea><p class="form-help">Masukkan satu nama pada setiap baris.</p></div></div>
+                        <div class="mt-5 grid gap-5"><div><label class="form-label" for="new-group-coordinator">Penanggung jawab</label><input class="form-input" id="new-group-coordinator" name="coordinator" placeholder="Nama penanggung jawab" maxlength="255" required></div><div><label class="form-label" for="new-group-members">Petugas piket</label><textarea class="form-input member-source" id="new-group-members" name="members" rows="5" placeholder="Satu petugas per baris" maxlength="5000" required></textarea><p class="form-help">Pilih nama dari data pegawai yang muncul saat mengetik, lalu tekan Enter. Nama manual tetap dapat digunakan.</p></div></div>
                         <div class="mt-6 flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end"><button class="btn-secondary" type="button" data-duty-group-create-close>Batal</button><button class="btn-primary" type="submit">Simpan kelompok</button></div>
                     </form>
                 </dialog>
@@ -104,12 +98,12 @@
                             <div class="mt-4 grid gap-4 sm:grid-cols-2">
                                 <div class="min-w-0">
                                     <label class="form-label" for="coordinator-{{ $group->id }}">Penanggung jawab</label>
-                                    <input class="form-input" id="coordinator-{{ $group->id }}" name="coordinator" list="employee-names" value="{{ request()->session()->getOldInput('_group_id') == $group->id ? old('coordinator') : $group->coordinator }}" maxlength="255" required>
+                                    <input class="form-input" id="coordinator-{{ $group->id }}" name="coordinator" list="employee-names" value="{{ request()->session()->getOldInput('_group_id') == $group->id ? old('coordinator') : $group->coordinator }}" maxlength="255" required pattern=".*">
                                 </div>
                                 <div class="min-w-0">
                                     <label class="form-label" for="members-{{ $group->id }}">Petugas piket</label>
-                                    <textarea class="form-input" id="members-{{ $group->id }}" name="members" rows="4" maxlength="5000" required>{{ request()->session()->getOldInput('_group_id') == $group->id ? old('members') : implode("\n", $group->members) }}</textarea>
-                                    <p class="form-help">Satu nama per baris. Nama dari ref tetap bisa digunakan meskipun belum ada di master pegawai.</p>
+                                    <textarea class="form-input member-source" id="members-{{ $group->id }}" name="members" rows="4" maxlength="5000" required>{{ request()->session()->getOldInput('_group_id') == $group->id ? old('members') : implode("\n", $group->members) }}</textarea>
+                                    <p class="form-help">Pilih nama dari data pegawai aktif yang muncul saat mengetik. Nama di luar daftar akan ditolak.</p>
                                 </div>
                             </div>
                             <input type="hidden" name="_group_id" value="{{ $group->id }}">
@@ -120,6 +114,9 @@
                     @endif
                 @endforeach
             </div>
+            @if ($canManage)
+                <button class="btn-primary mt-5" type="button" data-duty-group-create-open>Tambah kelompok {{ $groups->count() + 1 }}</button>
+            @endif
         </section>
     @else
         <section class="card mt-5">

@@ -12,6 +12,7 @@
             <h1 class="page-title mt-2">Integrasi API</h1>
             <p class="page-description">Buat token untuk menghubungkan SIMPEG dengan sistem lain melalui REST API versi 1.</p>
         </div>
+        <button class="btn-primary shrink-0" type="button" data-api-token-create-open>Buat token baru</button>
     </div>
 
     @if ($plainTextToken)
@@ -30,14 +31,16 @@
         </section>
     @endif
 
-    <div class="mt-7 grid gap-7 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.78fr)]">
-        <section class="card">
-            <div>
-                <h2 class="section-heading">Buat token baru</h2>
-                <p class="section-description">Beri akses secukupnya untuk sistem yang akan terhubung.</p>
+        <dialog class="api-token-create-dialog" data-api-token-create-dialog data-open-on-error="{{ $errors->any() ? 'true' : 'false' }}" aria-labelledby="api-token-create-title" aria-describedby="api-token-create-description">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h2 class="section-heading" id="api-token-create-title">Buat token baru</h2>
+                    <p class="section-description" id="api-token-create-description">Beri akses secukupnya untuk sistem yang akan terhubung.</p>
+                </div>
+                <button class="btn-secondary" type="button" data-api-token-create-close aria-label="Tutup form token">×</button>
             </div>
 
-            <form class="mt-6 grid gap-5" method="POST" action="{{ route('api-tokens.store') }}">
+            <form id="api-token-create-form" class="mt-6 grid gap-5" method="POST" action="{{ route('api-tokens.store') }}">
                 @csrf
 
                 <div>
@@ -71,64 +74,15 @@
                     @error('abilities.*') <p class="form-error">{{ $message }}</p> @enderror
                 </fieldset>
 
-                <div class="flex justify-end border-t border-slate-100 pt-6">
-                    <button class="btn-primary" type="submit">
+            </form>
+                <div class="flex shrink-0 justify-end gap-3 border-t border-slate-100 pt-4">
+                    <button class="btn-secondary" type="button" data-api-token-create-close>Batal</button>
+                    <button class="btn-primary" type="submit" form="api-token-create-form">
                         <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                         Buat token API
                     </button>
                 </div>
-            </form>
-        </section>
-
-        <section class="card">
-            <div>
-                <h2 class="section-heading">Cara memakai</h2>
-                <p class="section-description">Kirim token pada setiap permintaan sebagai Bearer token.</p>
-            </div>
-
-            <div class="card-inner mt-6">
-                <p class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Base URL</p>
-                <code class="mt-2 block break-all font-mono text-sm font-semibold text-slate-800">{{ $apiBaseUrl }}</code>
-            </div>
-
-            <div class="mt-5 grid gap-3 text-sm">
-                <div class="rounded-xl bg-slate-50 p-4">
-                    <p class="font-mono font-semibold text-slate-800">GET {{ $apiBaseUrl }}/employees</p>
-                    <p class="mt-1 leading-5 text-slate-500">Daftar pegawai. Izin: <code>employees:read</code>.</p>
-                    <p class="mt-2 leading-5 text-slate-500">Tambahkan <code>?view=imported</code> untuk mengembalikan hanya kolom yang dikenali dari file impor terakhir tiap pegawai. Berlaku juga untuk <code>/employees/NIP</code>. NIK dan rekening memerlukan izin <code>employees:profile</code>.</p>
-                    <p class="mt-2 leading-5 text-slate-500">Mode ini mengembalikan data pegawai saat ini. Untuk impor lama yang belum mencatat kolom sumber, hanya NIP dikembalikan; impor ulang agar kolomnya tercatat.</p>
-                </div>
-                <div class="rounded-xl bg-slate-50 p-4">
-                    <p class="font-mono font-semibold text-slate-800">POST {{ $apiBaseUrl }}/employees</p>
-                    <p class="mt-1 leading-5 text-slate-500">Tambah pegawai. Izin: <code>employees:write</code>.</p>
-                </div>
-                <div class="rounded-xl bg-slate-50 p-4">
-                    <p class="font-mono font-semibold text-slate-800">GET {{ $apiBaseUrl }}/leave-requests</p>
-                    <p class="mt-1 leading-5 text-slate-500">Daftar formulir cuti. Izin: <code>leave-requests:read</code>.</p>
-                </div>
-            </div>
-
-            <pre class="mt-5 overflow-x-auto rounded-xl bg-slate-950 p-4 font-mono text-xs leading-6 text-slate-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]"><code>curl -H "Authorization: Bearer TOKEN_ANDA" \
-  "{{ $apiBaseUrl }}/employees"</code></pre>
-            <div class="mt-6 border-t border-slate-100 pt-5">
-                <h3 class="section-heading">Reminder jadwal untuk Telegram</h3>
-                <p class="section-description">Parameter date opsional (YYYY-MM-DD). Tanpa date, digunakan hari ini menurut waktu Asia/Pontianak.</p>
-                <div class="mt-4 grid gap-3 text-sm">
-                    @foreach (['ceremony-schedules' => ['Apel / Upacara', 'ceremony-schedules:read'], 'counter-duty-schedules' => ['Piket Kecamatan', 'counter-duty-schedules:read'], 'kelurahan-duty-schedules' => ['Piket Kelurahan', 'counter-duty-schedules:read']] as $endpoint => $details)
-                        <div class="rounded-xl bg-slate-50 p-4">
-                            <p class="font-semibold text-slate-800">{{ $details[0] }}</p>
-                            <code class="mt-2 block break-all">GET {{ $apiBaseUrl }}/{{ $endpoint }}/reminder?date={{ now('Asia/Pontianak')->toDateString() }}</code>
-                            <p class="mt-2 text-slate-500">Izin: <code>{{ $details[1] }}</code>.</p>
-                        </div>
-                    @endforeach
-                </div>
-                <p class="mt-4 text-sm leading-6 text-slate-600">Cek <code>isAvailable</code>: <strong>0</strong> berarti hentikan eksekusi cron saat itu; <strong>1</strong> berarti kirim field <code>message</code> tingkat atas ke Telegram sebagai teks biasa. Field <code>data</code> memuat rincian tiap jadwal. API tidak mengirim pesan ke Telegram secara langsung.</p>
-                <pre class="mt-4 overflow-x-auto rounded-xl bg-slate-950 p-4 font-mono text-xs leading-6 text-slate-100"><code>curl -H "Authorization: Bearer TOKEN_ANDA" \
-  -H "Accept: application/json" \
-  "{{ $apiBaseUrl }}/counter-duty-schedules/reminder?date={{ now('Asia/Pontianak')->toDateString() }}"</code></pre>
-            </div>
-        </section>
-    </div>
+        </dialog>
 
     <section class="card mt-7">
         <div class="flex flex-col gap-2 border-b border-slate-100 pb-5 sm:flex-row sm:items-end sm:justify-between">
@@ -177,4 +131,55 @@
             </div>
         @endif
     </section>
+
+    <div class="mt-7">
+        <section class="card">
+            <div>
+                <h2 class="section-heading">Cara memakai</h2>
+                <p class="section-description">Kirim token pada setiap permintaan sebagai Bearer token.</p>
+            </div>
+
+            <div class="card-inner mt-6">
+                <p class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Base URL</p>
+                <code class="mt-2 block break-all font-mono text-sm font-semibold text-slate-800">{{ $apiBaseUrl }}</code>
+            </div>
+
+            <div class="mt-5 grid gap-3 text-sm">
+                <div class="rounded-xl bg-slate-50 p-4">
+                    <p class="font-mono font-semibold text-slate-800">GET {{ $apiBaseUrl }}/employees</p>
+                    <p class="mt-1 leading-5 text-slate-500">Daftar pegawai. Izin: <code>employees:read</code>.</p>
+                    <p class="mt-2 leading-5 text-slate-500">Tambahkan <code>?view=imported</code> untuk mengembalikan hanya kolom yang dikenali dari file impor terakhir tiap pegawai. Berlaku juga untuk <code>/employees/NIP</code>. NIK dan rekening memerlukan izin <code>employees:profile</code>.</p>
+                    <p class="mt-2 leading-5 text-slate-500">Mode ini mengembalikan data pegawai saat ini. Untuk impor lama yang belum mencatat kolom sumber, hanya NIP dikembalikan; impor ulang agar kolomnya tercatat.</p>
+                    <x-api-example id="employees-example" :url="$apiBaseUrl.'/employees'" />
+                </div>
+                <div class="rounded-xl bg-slate-50 p-4">
+                    <p class="font-mono font-semibold text-slate-800">POST {{ $apiBaseUrl }}/employees</p>
+                    <p class="mt-1 leading-5 text-slate-500">Tambah pegawai. Izin: <code>employees:write</code>.</p>
+                    <p class="mt-2 text-slate-500">Contoh berikut membuat data baru. Ganti NIP dan data contoh dengan data sebenarnya sebelum menjalankan.</p>
+                    <x-api-example id="employees-create-example" :url="$apiBaseUrl.'/employees'" method="POST" :payload="['nip' => '199001012020011001', 'full_name' => 'Pegawai Contoh', 'position_title' => 'Staf', 'employment_status' => 'PNS', 'rank_grade' => 'III/a']" />
+                </div>
+                <div class="rounded-xl bg-slate-50 p-4">
+                    <p class="font-mono font-semibold text-slate-800">GET {{ $apiBaseUrl }}/leave-requests</p>
+                    <p class="mt-1 leading-5 text-slate-500">Daftar formulir cuti. Izin: <code>leave-requests:read</code>.</p>
+                    <x-api-example id="leave-requests-example" :url="$apiBaseUrl.'/leave-requests'" />
+                </div>
+            </div>
+
+            <div class="mt-6 border-t border-slate-100 pt-5">
+                <h3 class="section-heading">Reminder jadwal untuk Telegram</h3>
+                <p class="section-description">Parameter date opsional (YYYY-MM-DD). Tanpa date, digunakan hari ini menurut waktu Asia/Pontianak.</p>
+                <div class="mt-4 grid gap-3 text-sm">
+                    @foreach (['ceremony-schedules' => ['Apel / Upacara', 'ceremony-schedules:read'], 'counter-duty-schedules' => ['Piket Kecamatan', 'counter-duty-schedules:read'], 'kelurahan-duty-schedules' => ['Piket Kelurahan', 'counter-duty-schedules:read']] as $endpoint => $details)
+                        <div class="rounded-xl bg-slate-50 p-4">
+                            <p class="font-semibold text-slate-800">{{ $details[0] }}</p>
+                            <code class="mt-2 block break-all">GET {{ $apiBaseUrl }}/{{ $endpoint }}/reminder?date={{ now('Asia/Pontianak')->toDateString() }}</code>
+                            <p class="mt-2 text-slate-500">Izin: <code>{{ $details[1] }}</code>.</p>
+                            <x-api-example :id="$endpoint.'-example'" :url="$apiBaseUrl.'/'.$endpoint.'/reminder?date='.now('Asia/Pontianak')->toDateString()" />
+                        </div>
+                    @endforeach
+                </div>
+                <p class="mt-4 text-sm leading-6 text-slate-600">Cek <code>isAvailable</code>: <strong>0</strong> berarti hentikan eksekusi cron saat itu; <strong>1</strong> berarti kirim field <code>message</code> tingkat atas ke Telegram sebagai teks biasa. Field <code>data</code> memuat rincian tiap jadwal. API tidak mengirim pesan ke Telegram secara langsung.</p>
+            </div>
+        </section>
+    </div>
 @endsection

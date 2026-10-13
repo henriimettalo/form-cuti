@@ -30,7 +30,7 @@ class CeremonyScheduleTest extends TestCase
             $user = User::factory()->create(['role' => $role, 'department_id' => $department->id]);
             $response = $this->actingAs($user)->get(route('ceremony-schedules.index', ['month' => '2026-10']));
             $response->assertOk()
-                ->assertSee('data-workspace-title="Jadwal Kegiatan"', false)
+                ->assertSee('data-workspace-title="Jadwal Upacara"', false)
                 ->assertSee('Apel Senin')
                 ->assertSee('Unit Petugas');
 
@@ -76,14 +76,13 @@ class CeremonyScheduleTest extends TestCase
         $this->travelBack();
     }
 
-    public function test_filter_and_form_offer_combined_ceremony_type_and_counter_duty(): void
+    public function test_ceremony_page_does_not_duplicate_counter_duty_navigation(): void
     {
         $this->actingAs(User::factory()->create());
 
         $this->get(route('ceremony-schedules.index'))
             ->assertOk()
-            ->assertSee('Apel / Upacara')
-            ->assertSee('Piket Loket')
+            ->assertSee('Jadwal Upacara')
             ->assertDontSee('<option value="upacara"', false);
         $this->get(route('ceremony-schedules.create', ['type' => 'piket_loket']))
             ->assertOk()

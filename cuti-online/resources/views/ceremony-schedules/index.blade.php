@@ -1,17 +1,19 @@
 @extends('layouts.app')
 
-@section('title', 'Jadwal Kegiatan')
+@section('title', 'Jadwal Upacara')
 
 @section('content')
-    <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-            <h1 class="page-title" data-sticky-page-title>Jadwal kegiatan</h1>
-            <p class="page-description">Lihat tanggal dan unit petugas untuk apel/upacara serta piket loket.</p>
+    <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div class="min-w-0">
+            <h1 class="page-title" data-sticky-page-title>Jadwal Upacara</h1>
+            <p class="page-description">Kalender jadwal apel dan upacara beserta unit petugasnya.</p>
         </div>
-        <nav class="flex shrink-0 flex-wrap gap-2 self-start sm:self-center" aria-label="Jenis jadwal">
-            <a class="{{ request('tab') === 'kalender' || request()->routeIs('ceremony-schedules.*') && request('tab') !== 'piket' ? 'btn-primary' : 'btn-secondary' }}" href="{{ route('ceremony-schedules.index', ['year' => $calendarYear, 'tab' => 'kalender']) }}" @if (request('tab') !== 'piket') aria-current="page" @endif>Apel / Upacara</a>
-            <a class="btn-secondary" href="{{ route('counter-duty.index', ['month' => $month->format('Y-m')]) }}">Piket Loket</a>
-        </nav>
+        @if (request('tab') === 'kalender' && $canManage)
+            <section class="card-inner flex shrink-0 items-center justify-between gap-4 lg:w-[27rem]" aria-label="Pengaturan urutan kelompok">
+                <div><p class="font-semibold text-slate-800">Urutan kelompok</p><p class="mt-1 text-sm text-slate-600">Atur jumlah kelompok dan kelurahan petugas.</p></div>
+                <button class="btn-secondary shrink-0" type="button" data-ceremony-groups-open>Atur kelompok</button>
+            </section>
+        @endif
     </div>
 
     @if (request('tab') === 'kalender')
@@ -48,10 +50,6 @@
                 @endif
             @endforeach
             @error('days')<p class="form-error mb-3">{{ $message }}</p>@enderror
-            <div class="mb-5 flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div><p class="font-semibold text-slate-800">Urutan kelompok</p><p class="mt-1 text-sm text-slate-600">Atur jumlah kelompok dan kelurahan petugas.</p></div>
-                <button class="btn-secondary shrink-0" type="button" data-ceremony-groups-open>Atur kelompok</button>
-            </div>
             <dialog class="m-auto max-h-[calc(100dvh-2rem)] w-[min(100%-2rem,42rem)] overflow-y-auto rounded-2xl p-0 shadow-2xl backdrop:bg-slate-950/50" data-ceremony-groups-dialog data-save-url="{{ route('ceremony-schedules.groups') }}" aria-labelledby="ceremony-groups-title">
                 <div class="p-6">
                     <div class="flex items-start justify-between gap-4 border-b border-slate-100 pb-4"><div><h3 class="text-lg font-semibold text-slate-900" id="ceremony-groups-title">Urutan kelompok apel</h3><p class="mt-1 text-sm text-slate-600">Setiap kelurahan hanya boleh dipakai satu kelompok.</p></div><button class="btn-secondary px-3" type="button" data-ceremony-groups-close aria-label="Tutup">×</button></div>

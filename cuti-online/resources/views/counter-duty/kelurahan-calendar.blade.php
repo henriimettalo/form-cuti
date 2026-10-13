@@ -1,33 +1,30 @@
 @extends('layouts.app')
 @section('title', 'Kalender Kelurahan')
 @section('content')
-    <div class="flex flex-col gap-4">
-        <div>
-            <h1 class="page-title">Kalender kelurahan</h1>
-            <p class="page-description">Tampilan khusus jadwal piket berdasarkan tanggal dan kelurahan.</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2 [&>a]:whitespace-nowrap">
-            @if ($canManage)<a class="btn-primary" href="{{ route('counter-duty.kelurahan-assignments', ['month' => $month->format('Y-m')]) }}">Atur petugas kelurahan</a>@endif
-            <a class="btn-secondary" href="{{ route('counter-duty.index', ['tab' => 'agenda', 'month' => $month->format('Y-m')]) }}">Kembali ke jadwal piket</a>
-        </div>
+    <div>
+        <h1 class="page-title">Kalender kelurahan</h1>
+        <p class="page-description">Tampilan khusus jadwal piket berdasarkan tanggal dan kelurahan.</p>
     </div>
 
     <section class="card mt-5">
         <div class="border-b border-slate-100 pb-5">
-            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div class="min-w-0">
-                <h2 class="section-heading">Piket {{ $month->locale('id')->translatedFormat('F Y') }}</h2>
-                <p class="section-description">Kelurahan berada di bagian atas, tanggal berada di sisi kiri.</p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2 sm:flex-nowrap xl:shrink-0">
-                <a class="btn-secondary shrink-0 whitespace-nowrap" href="{{ route('counter-duty.kelurahan-calendar', ['month' => $month->subMonth()->format('Y-m')]) }}">Bulan sebelumnya</a>
-                <form class="w-44 shrink-0" method="GET" action="{{ route('counter-duty.kelurahan-calendar') }}">
-                    <label class="sr-only" for="kelurahan-calendar-month-trigger">Bulan dan tahun</label>
-                    <x-month-picker id="kelurahan-calendar-month" name="month" value="{{ $month->format('Y-m') }}" :years="range(2026, 2030)" :auto-submit="true" />
-                </form>
-                <a class="btn-secondary shrink-0 whitespace-nowrap" href="{{ route('counter-duty.kelurahan-calendar', ['month' => $month->addMonth()->format('Y-m')]) }}">Bulan berikutnya</a>
-            </div>
-            </div>
+                <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                    <div class="min-w-0">
+                        <h2 class="section-heading">Piket {{ $month->locale('id')->translatedFormat('F Y') }}</h2>
+                        <p class="section-description">Kelurahan berada di bagian atas, tanggal berada di sisi kiri.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-2 xl:flex-1">
+                        <div class="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+                            <a class="btn-secondary shrink-0 whitespace-nowrap" href="{{ route('counter-duty.kelurahan-calendar', ['month' => $month->subMonth()->format('Y-m')]) }}">Bulan sebelumnya</a>
+                            <form class="w-44 shrink-0" method="GET" action="{{ route('counter-duty.kelurahan-calendar') }}">
+                                <label class="sr-only" for="kelurahan-calendar-month-trigger">Bulan dan tahun</label>
+                                <x-month-picker id="kelurahan-calendar-month" name="month" value="{{ $month->format('Y-m') }}" :years="range(2026, 2030)" :auto-submit="true" />
+                            </form>
+                            <a class="btn-secondary shrink-0 whitespace-nowrap" href="{{ route('counter-duty.kelurahan-calendar', ['month' => $month->addMonth()->format('Y-m')]) }}">Bulan berikutnya</a>
+                        </div>
+                        @if ($canManage)<a class="btn-primary shrink-0 whitespace-nowrap xl:ml-auto" href="{{ route('counter-duty.kelurahan-assignments', ['month' => $month->format('Y-m')]) }}">Atur petugas kelurahan</a>@endif
+                    </div>
+                </div>
             @if ($canManage)<p class="mt-3 text-xs leading-relaxed text-slate-500">Klik sel kelurahan untuk memilih kelompok. Rotasi mengisi tanggal hari ini dan seterusnya dalam bulan ini, termasuk akhir pekan. Jadwal tanggal yang sudah lewat terkunci.</p>@endif
         </div>
 

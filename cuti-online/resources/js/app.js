@@ -1,3 +1,132 @@
+const apiTokenCreateDialog = document.querySelector('[data-api-token-create-dialog]');
+document.querySelectorAll('textarea.member-source').forEach((source) => {
+    const editor = document.createElement('div');
+    editor.className = 'member-chip-editor';
+    const input = document.createElement('input');
+    input.className = 'member-chip-input';
+    input.placeholder = 'Ketik nama, lalu Enter';
+    input.setAttribute('list', 'employee-names');
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('pattern', '.*');
+    editor.append(input);
+    source.hidden = true;
+    source.parentElement.insertBefore(editor, source);
+    const names = () => source.value.split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
+    const sync = () => {
+        editor.querySelectorAll('.member-chip').forEach((chip) => chip.remove());
+        names().forEach((name) => {
+            const chip = document.createElement('span');
+            chip.className = 'member-chip';
+            chip.textContent = name;
+            const remove = document.createElement('button');
+            remove.className = 'member-chip-remove';
+            remove.type = 'button';
+            remove.textContent = '×';
+            remove.setAttribute('aria-label', `Hapus ${name}`);
+            remove.addEventListener('click', () => {
+                source.value = names().filter((item) => item !== name).join('\n');
+                sync();
+            });
+            chip.append(remove);
+            editor.insertBefore(chip, input);
+        });
+    };
+    input.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ',') return;
+        event.preventDefault();
+        const name = input.value.trim().replace(/,$/, '');
+        const employeeNames = new Set(Array.from(document.querySelectorAll('#employee-names option')).map((option) => option.value));
+        if (!name || names().includes(name)) return;
+        if (!employeeNames.has(name)) {
+            input.setCustomValidity('Pilih nama dari daftar pegawai aktif.');
+            input.reportValidity();
+            return;
+        }
+        input.setCustomValidity('');
+        source.value = [...names(), name].join('\n');
+        input.value = '';
+        sync();
+    });
+    source.closest('form')?.addEventListener('submit', () => {
+        if (input.value.trim()) {
+            const employeeNames = new Set(Array.from(document.querySelectorAll('#employee-names option')).map((option) => option.value));
+            if (employeeNames.has(input.value.trim())) source.value = [...names(), input.value.trim()].join('\n');
+        }
+    });
+    sync();
+});
+
+document.querySelectorAll('[data-api-example]').forEach((example) => {
+    const tabs = Array.from(example.querySelectorAll('[data-example-tab]'));
+    const panels = Array.from(example.querySelectorAll('[data-example-panel]'));
+    const selectTab = (selectedIndex) => {
+        tabs.forEach((tab, index) => {
+            tab.setAttribute('aria-selected', String(index === selectedIndex));
+            tab.tabIndex = index === selectedIndex ? 0 : -1;
+            panels[index].hidden = index !== selectedIndex;
+        });
+        example.querySelector('[data-example-status]').textContent = '';
+    };
+    tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => selectTab(index));
+        tab.addEventListener('keydown', (event) => {
+            let nextIndex;
+            if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+            else if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+            else if (event.key === 'Home') nextIndex = 0;
+            else if (event.key === 'End') nextIndex = tabs.length - 1;
+            else return;
+            event.preventDefault();
+            selectTab(nextIndex);
+            tabs[nextIndex].focus();
+        });
+    });
+    example.querySelector('[data-example-copy]').addEventListener('click', async () => {
+        const panel = panels.find((element) => !element.hidden);
+        const status = example.querySelector('[data-example-status]');
+        try {
+            await navigator.clipboard.writeText(panel.textContent);
+            status.textContent = 'Kode berhasil disalin.';
+        } catch {
+            const range = document.createRange();
+            range.selectNodeContents(panel);
+            const selection = window.getSelection();
+            selection?.removeAllRanges();
+            selection?.addRange(range);
+            status.textContent = 'Kode sudah dipilih. Tekan Ctrl+C atau Command+C untuk menyalin.';
+        }
+    });
+});
+
+if (apiTokenCreateDialog) {
+    const openButton = document.querySelector('[data-api-token-create-open]');
+    const sizeTokenDialog = () => {
+        let availableHeight = window.innerHeight;
+        let topOffset = 0;
+        try {
+            const frame = window.frameElement;
+            if (frame) {
+                const bounds = frame.getBoundingClientRect();
+                topOffset = Math.max(0, -bounds.top);
+                availableHeight = Math.min(bounds.bottom, window.parent.innerHeight) - Math.max(bounds.top, 0);
+            }
+        } catch {}
+        apiTokenCreateDialog.style.setProperty('--api-modal-height', `${Math.max(200, availableHeight - 32)}px`);
+        apiTokenCreateDialog.style.marginTop = `${topOffset + 16}px`;
+    };
+    const openTokenDialog = () => {
+        sizeTokenDialog();
+        apiTokenCreateDialog.showModal();
+    };
+    openButton?.addEventListener('click', openTokenDialog);
+    window.addEventListener('resize', sizeTokenDialog);
+    apiTokenCreateDialog.querySelectorAll('[data-api-token-create-close]').forEach((button) => {
+        button.addEventListener('click', () => apiTokenCreateDialog.close());
+    });
+    apiTokenCreateDialog.addEventListener('close', () => openButton?.focus());
+    if (apiTokenCreateDialog.dataset.openOnError === 'true') openTokenDialog();
+}
+
 document.querySelector('[data-copy-api-token]')?.addEventListener('click', async () => {
     const token = document.getElementById('new-api-token');
     const status = document.querySelector('[data-copy-api-token-status]');
@@ -3228,4 +3357,8 @@ document.querySelectorAll('[data-status-dialog]').forEach((dialog) => {
         if (redirect) window.location.href = redirect;
     };
     dialog.querySelectorAll('[data-status-dialog-close]').forEach((button) => button.addEventListener('click', close));
+});
+
+document.querySelectorAll('[data-public-print]').forEach((button) => {
+    button.addEventListener('click', () => window.print());
 });

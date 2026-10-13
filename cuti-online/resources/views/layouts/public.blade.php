@@ -26,7 +26,7 @@
     <div class="mx-auto max-w-[1440px]">
         <main id="public-content" class="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
             @if ($publicTab)
-                <a class="btn-secondary mb-5" href="{{ route('public-schedules.index') }}">← Kembali ke pilihan jadwal</a>
+                <a class="btn-secondary mb-5 print:hidden" href="{{ route('public-schedules.index') }}">← Kembali ke pilihan jadwal</a>
             @endif
             @yield('content')
         </main>

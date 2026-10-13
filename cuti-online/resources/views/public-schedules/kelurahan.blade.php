@@ -1,11 +1,14 @@
 @extends('layouts.public')
 @section('title', 'Jadwal Piket Kelurahan')
 @section('content')
-    <div>
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
         <p class="text-sm font-semibold text-sky-700">Informasi untuk umum</p>
         <h1 class="page-title mt-1">Jadwal piket kelurahan</h1>
         <p class="page-description">Hanya menampilkan jadwal kemarin, hari ini, dan besok. Halaman ini hanya untuk dibaca.</p>
         <p class="mt-2 text-xs text-slate-500">Tanggal mengikuti waktu Asia/Pontianak.</p>
+        </div>
+        <button class="btn-secondary print:hidden" type="button" data-public-print>Unduh PDF / Cetak</button>
     </div>
     <section class="card mt-5" aria-label="Jadwal piket kelurahan tiga hari">
         @if ($kelurahans->isEmpty())

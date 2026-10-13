@@ -3,13 +3,13 @@
 @section('title', 'Data Pegawai')
 
 @section('content')
-    <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+    <div class="flex flex-col gap-4">
         <div class="min-w-0">
             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">{{ $showArchived ? 'Arsip data' : 'Master data' }}</p>
             <h1 class="page-title mt-2" data-sticky-page-title>{{ $showArchived ? 'Arsip pegawai' : 'Pegawai' }}</h1>
             <p class="page-description">{{ $showArchived ? 'Data pegawai yang diarsipkan tidak dapat dipilih pada formulir cuti, tetapi tetap dapat dipulihkan kapan saja.' : 'Kelola profil, pangkat, jabatan, dan unit kerja pegawai. Modul cuti memakai data aktif dari sini.' }}</p>
         </div>
-        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
+        <div class="flex flex-wrap items-center justify-end gap-2">
             @if (! $showArchived)
                 <a class="btn-secondary shrink-0" href="{{ route('employees.identity-import.create') }}" data-import-modal-link>
                     <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5v-9m0 9 3.75-3.75M12 16.5 8.25 12.75M4.5 18.75v.75A1.5 1.5 0 0 0 6 21h12a1.5 1.5 0 0 0 1.5-1.5v-.75" /></svg>

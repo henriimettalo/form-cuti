@@ -282,9 +282,13 @@ class CounterDutyController extends Controller
             'members' => ['required', 'string', 'max:5000'],
         ], [], ['coordinator' => 'penanggung jawab', 'members' => 'petugas piket']);
         $members = array_values(array_filter(array_map('trim', preg_split('/\R/u', $input['members']))));
+        $employeeNames = Employee::query()->where('is_active', true)->pluck('full_name')->all();
 
         if ($members === [] || count($members) > 20 || count($members) !== count(array_unique($members)) || in_array($input['coordinator'], $members, true)) {
             throw ValidationException::withMessages(['members' => 'Isi 1–20 petugas yang berbeda, satu nama per baris. Penanggung jawab tidak perlu diulang.']);
+        }
+        if ($employeeNames !== [] && (! in_array($input['coordinator'], $employeeNames, true) || array_diff($members, $employeeNames) !== [])) {
+            throw ValidationException::withMessages(['members' => 'Penanggung jawab dan petugas harus dipilih dari daftar pegawai aktif.']);
         }
         foreach ($members as $member) {
             if (mb_strlen($member) > 255) {
