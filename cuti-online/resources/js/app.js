@@ -2691,6 +2691,23 @@ if (employeeImportForm) {
 }
 
 const employeePerPageSelect = document.querySelector('[data-employee-per-page]');
+const employeeFilterForm = document.querySelector('#employee-filter-form');
+const employeeSearchInput = employeeFilterForm?.querySelector('#search');
+
+if (employeeFilterForm && employeeSearchInput) {
+    let employeeSearchTimeout;
+
+    employeeSearchInput.addEventListener('input', () => {
+        clearTimeout(employeeSearchTimeout);
+
+        const search = employeeSearchInput.value.trim();
+        if (search.length > 0 && search.length < 2) return;
+
+        employeeSearchTimeout = window.setTimeout(() => {
+            employeeFilterForm.requestSubmit();
+        }, 350);
+    });
+}
 
 if (employeePerPageSelect) {
     employeePerPageSelect.addEventListener('change', () => {
