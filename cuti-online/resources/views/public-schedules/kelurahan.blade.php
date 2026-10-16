@@ -10,7 +10,7 @@
         </div>
         <button class="btn-secondary print:hidden" type="button" data-public-print>Unduh PDF / Cetak</button>
     </div>
-    <section class="card mt-5" aria-label="Jadwal piket kelurahan tiga hari">
+    <section class="card mt-5" aria-label="Jadwal piket kelurahan tiga hari" data-public-calendar data-public-calendar-type="kelurahan">
         @if ($kelurahans->isEmpty())
             <p class="text-sm text-slate-500">Belum ada kelurahan aktif.</p>
         @else

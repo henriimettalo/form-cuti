@@ -701,6 +701,25 @@ html[data-workspace-frame='true'] .app-shell > main {
     body[data-public-layout] [data-public-calendar-type='piket'] [data-public-calendar-grid] li {
         line-height: 1.1 !important;
     }
+
+    body[data-public-layout] [data-public-calendar] [data-public-calendar-grid] > div:last-child > div,
+    body[data-public-layout] [data-public-calendar-type='kelurahan'] td,
+    body[data-public-layout] [data-public-calendar-type='kelurahan'] th {
+        text-align: center !important;
+    }
+
+    body[data-public-layout] [data-public-calendar] [data-public-calendar-grid] > div:last-child > div > div:first-child {
+        justify-content: center !important;
+    }
+
+    body[data-public-layout] [data-public-calendar] [data-public-calendar-grid] ol {
+        list-style-position: inside !important;
+        padding-left: 0 !important;
+    }
+
+    body[data-public-layout] [data-public-calendar-type='kelurahan'] .sticky {
+        position: static !important;
+    }
 }
 
 @media (min-width: 640px) {
