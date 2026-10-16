@@ -1637,14 +1637,26 @@ if (leaveForm) {
             .trim();
         const escapeRegularExpression = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const employeeSearchMatcher = (query) => {
-            const expression = normaliseEmployeeSearchValue(query)
+            const normalisedQuery = normaliseEmployeeSearchValue(query);
+            const queryWords = normalisedQuery.split(' ').filter(Boolean);
+            if (queryWords.length > 0 && !normalisedQuery.includes('*') && queryWords.every((word) => /^[a-z]+$/i.test(word))) {
+                return (label) => {
+                    const name = normaliseEmployeeSearchValue(label.split('·')[0]);
+                    const nameWords = name.split(' ').filter(Boolean);
+
+                    return queryWords.every((word) => nameWords.some((nameWord) => nameWord.startsWith(word)));
+                };
+            }
+
+            const expression = normalisedQuery
                 .split('*')
                 .flatMap((part) => part.split(' '))
                 .filter(Boolean)
                 .map(escapeRegularExpression)
                 .join('.*');
 
-            return expression ? new RegExp(expression, 'i') : null;
+            const matcher = expression ? new RegExp(expression, 'i') : null;
+            return matcher ? (label) => matcher.test(normaliseEmployeeSearchValue(label)) : null;
         };
         let activeEmployeeOptionIndex = -1;
         const visibleEmployeeOptions = () => employeeOptions.filter((option) => !option.hidden);
@@ -1660,7 +1672,7 @@ if (leaveForm) {
             let resultCount = 0;
 
             employeeOptions.forEach((option) => {
-                const matches = !matcher || matcher.test(normaliseEmployeeSearchValue(option.dataset.employeeLabel));
+                const matches = !matcher || matcher(option.dataset.employeeLabel);
                 const listItem = option.closest('li');
                 const index = option.querySelector('[data-employee-option-index]');
 

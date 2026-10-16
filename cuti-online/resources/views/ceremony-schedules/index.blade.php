@@ -28,7 +28,7 @@
                 <a class="btn-secondary" href="{{ route('ceremony-schedules.index', ['year' => $calendarYear, 'tab' => 'kalender', 'calendar_month' => $calendarPickerMonth - 1]) }}">Bulan sebelumnya</a>
             @endif
             <div class="sm:w-44">
-                <label class="form-label" for="calendar_month_picker-trigger">Bulan dan tahun</label>
+                <label class="sr-only" for="calendar_month_picker-trigger">Bulan dan tahun</label>
                 <x-month-picker id="calendar_month_picker" name="calendar_month_picker" value="{{ sprintf('%04d-%02d', $calendarYear, $calendarPickerMonth) }}" :years="$calendarYears" year-name="year" month-name="calendar_month" :auto-submit="true" />
             </div>
             @if ($calendarPickerMonth < 12)

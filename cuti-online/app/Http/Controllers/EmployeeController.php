@@ -50,13 +50,13 @@ class EmployeeController extends Controller
                     $searchTerm = "%{$search}%";
 
                     $query->where(static function ($query) use ($searchTerm): void {
-                        $query->where('full_name', 'like', $searchTerm)
-                            ->orWhere('nip', 'like', $searchTerm)
-                            ->orWhere('rank_name', 'like', $searchTerm)
-                            ->orWhere('grade', 'like', $searchTerm)
-                            ->orWhere('position_title', 'like', $searchTerm)
-                            ->orWhereHas('department', static fn ($departmentQuery) => $departmentQuery->where('name', 'like', $searchTerm))
-                            ->orWhereHas('position', static fn ($positionQuery) => $positionQuery->where('name', 'like', $searchTerm));
+                        $query->whereRaw('LOWER(full_name) LIKE LOWER(?)', [$searchTerm])
+                            ->orWhereRaw('LOWER(nip) LIKE LOWER(?)', [$searchTerm])
+                            ->orWhereRaw('LOWER(rank_name) LIKE LOWER(?)', [$searchTerm])
+                            ->orWhereRaw('LOWER(grade) LIKE LOWER(?)', [$searchTerm])
+                            ->orWhereRaw('LOWER(position_title) LIKE LOWER(?)', [$searchTerm])
+                            ->orWhereHas('department', static fn ($departmentQuery) => $departmentQuery->whereRaw('LOWER(name) LIKE LOWER(?)', [$searchTerm]))
+                            ->orWhereHas('position', static fn ($positionQuery) => $positionQuery->whereRaw('LOWER(name) LIKE LOWER(?)', [$searchTerm]));
                     });
                 })
                 ->when($employmentStatus, static fn ($query, $employmentStatus) => $query->where('employment_status', $employmentStatus))

@@ -3,29 +3,6 @@
 @section('title', 'Data Pegawai')
 
 @section('content')
-    <div class="flex flex-col gap-4">
-        <div class="min-w-0">
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">{{ $showArchived ? 'Arsip data' : 'Master data' }}</p>
-            <h1 class="page-title mt-2" data-sticky-page-title>{{ $showArchived ? 'Arsip pegawai' : 'Pegawai' }}</h1>
-            <p class="page-description">{{ $showArchived ? 'Data pegawai yang diarsipkan tidak dapat dipilih pada formulir cuti, tetapi tetap dapat dipulihkan kapan saja.' : 'Kelola profil, pangkat, jabatan, dan unit kerja pegawai. Modul cuti memakai data aktif dari sini.' }}</p>
-        </div>
-        <div class="flex flex-wrap items-center justify-end gap-2">
-            @if (! $showArchived)
-                <a class="btn-secondary shrink-0" href="{{ route('employees.identity-import.create') }}" data-import-modal-link>
-                    <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5v-9m0 9 3.75-3.75M12 16.5 8.25 12.75M4.5 18.75v.75A1.5 1.5 0 0 0 6 21h12a1.5 1.5 0 0 0 1.5-1.5v-.75" /></svg>
-                    Impor pegawai
-                </a>
-                <a class="btn-secondary shrink-0" href="{{ route('employees.change-logs.index') }}">
-                    Log perubahan
-                </a>
-                <a class="btn-primary shrink-0" href="{{ route('employees.create') }}">
-                    <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                    Tambah pegawai
-                </a>
-            @endif
-        </div>
-    </div>
-
     @php
         $listFilters = array_filter([
             'search' => $filters['search'],
@@ -36,13 +13,33 @@
             'direction' => $direction,
         ], static fn ($value) => $value !== null && $value !== '');
     @endphp
-    <nav class="employee-list-tabs mt-7" aria-label="Daftar dan arsip pegawai">
+    <div class="flex flex-col gap-4">
+        <div class="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div class="min-w-0">
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">{{ $showArchived ? 'Arsip data' : 'Master data' }}</p>
+            <h1 class="page-title mt-2" data-sticky-page-title>{{ $showArchived ? 'Arsip pegawai' : 'Pegawai' }}</h1>
+            <p class="page-description">{{ $showArchived ? 'Data pegawai yang diarsipkan tidak dapat dipilih pada formulir cuti, tetapi tetap dapat dipulihkan kapan saja.' : 'Kelola profil, pangkat, jabatan, dan unit kerja pegawai. Modul cuti memakai data aktif dari sini.' }}</p>
+            </div>
+            @if (! $showArchived)
+                <a class="btn-primary shrink-0 self-start sm:self-auto" href="{{ route('employees.create') }}">
+                    <svg aria-hidden="true" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                    Tambah pegawai
+                </a>
+            @endif
+        </div>
+    </div>
+
+    <nav class="employee-list-tabs mt-7" aria-label="Menu pegawai">
         <a @class(['employee-list-tab', 'employee-list-tab-active' => ! $showArchived])
            href="{{ route('employees.index', $listFilters) }}"
            @if (! $showArchived) aria-current="page" @endif>Daftar pegawai</a>
         <a @class(['employee-list-tab', 'employee-list-tab-active' => $showArchived])
            href="{{ route('employees.index', $listFilters + ['archived' => 1]) }}"
            @if ($showArchived) aria-current="page" @endif>Arsip pegawai</a>
+        @if (! $showArchived)
+            <a class="employee-list-tab" href="{{ route('employees.identity-import.create') }}">Impor pegawai</a>
+            <a class="employee-list-tab" href="{{ route('employees.change-logs.index') }}">Log perubahan</a>
+        @endif
     </nav>
 
     <form class="card mt-5" id="employee-filter-form" method="GET" action="{{ route('employees.index') }}">

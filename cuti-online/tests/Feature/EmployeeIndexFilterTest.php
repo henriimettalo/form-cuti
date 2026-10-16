@@ -81,7 +81,7 @@ class EmployeeIndexFilterTest extends TestCase
             'is_active' => true,
         ]);
 
-        foreach (['Suri', '199001012020011101', 'Pelayanan', 'Kecamatan Pontianak Selatan'] as $search) {
+        foreach (['Suri', 'suri', '199001012020011101', 'Pelayanan', 'Kecamatan Pontianak Selatan'] as $search) {
             $this->actingAs($operator)
                 ->get(route('employees.index', ['search' => $search]))
                 ->assertOk()
