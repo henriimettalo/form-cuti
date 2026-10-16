@@ -11,10 +11,14 @@ document.querySelectorAll('textarea.member-source').forEach((source) => {
     editor.append(input);
     source.hidden = true;
     source.parentElement.insertBefore(editor, source);
-    const names = () => source.value.split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
+    const normalizeName = (name) => name.normalize('NFKC').trim().replace(/\s+/g, ' ');
+    const nameKey = (name) => normalizeName(name).toLocaleLowerCase();
+    const names = () => source.value.split(/\r?\n/).map(normalizeName).filter(Boolean).filter((name, index, values) => values.findIndex((item) => nameKey(item) === nameKey(name)) === index);
     const sync = () => {
+        const uniqueNames = names();
+        source.value = uniqueNames.join('\n');
         editor.querySelectorAll('.member-chip').forEach((chip) => chip.remove());
-        names().forEach((name) => {
+        uniqueNames.forEach((name) => {
             const chip = document.createElement('span');
             chip.className = 'member-chip';
             chip.textContent = name;
@@ -24,7 +28,7 @@ document.querySelectorAll('textarea.member-source').forEach((source) => {
             remove.textContent = '×';
             remove.setAttribute('aria-label', `Hapus ${name}`);
             remove.addEventListener('click', () => {
-                source.value = names().filter((item) => item !== name).join('\n');
+                source.value = names().filter((item) => nameKey(item) !== nameKey(name)).join('\n');
                 sync();
             });
             chip.append(remove);
@@ -34,9 +38,9 @@ document.querySelectorAll('textarea.member-source').forEach((source) => {
     input.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter' && event.key !== ',') return;
         event.preventDefault();
-        const name = input.value.trim().replace(/,$/, '');
+        const name = normalizeName(input.value.replace(/,$/, ''));
         const employeeNames = new Set(Array.from(document.querySelectorAll('#employee-names option')).map((option) => option.value));
-        if (!name || names().includes(name)) return;
+        if (!name || names().some((item) => nameKey(item) === nameKey(name))) return;
         if (!employeeNames.has(name)) {
             input.setCustomValidity('Pilih nama dari daftar pegawai aktif.');
             input.reportValidity();
@@ -50,8 +54,10 @@ document.querySelectorAll('textarea.member-source').forEach((source) => {
     source.closest('form')?.addEventListener('submit', () => {
         if (input.value.trim()) {
             const employeeNames = new Set(Array.from(document.querySelectorAll('#employee-names option')).map((option) => option.value));
-            if (employeeNames.has(input.value.trim())) source.value = [...names(), input.value.trim()].join('\n');
+            const name = normalizeName(input.value);
+            if (employeeNames.has(name)) source.value = [...names(), name].join('\n');
         }
+        source.value = names().join('\n');
     });
     sync();
 });

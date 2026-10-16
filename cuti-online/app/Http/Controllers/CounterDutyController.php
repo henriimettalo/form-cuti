@@ -281,13 +281,17 @@ class CounterDutyController extends Controller
             'coordinator' => ['required', 'string', 'max:255'],
             'members' => ['required', 'string', 'max:5000'],
         ], [], ['coordinator' => 'penanggung jawab', 'members' => 'petugas piket']);
-        $members = array_values(array_filter(array_map('trim', preg_split('/\R/u', $input['members']))));
+        $coordinator = $this->normalizePersonName($input['coordinator']);
+        $members = array_values(array_filter(array_map(fn ($name) => $this->normalizePersonName($name), preg_split('/\R/u', $input['members']))));
         $employeeNames = Employee::query()->where('is_active', true)->pluck('full_name')->all();
+        $memberKeys = array_map($this->personNameKey(...), $members);
+        $coordinatorKey = $this->personNameKey($coordinator);
 
-        if ($members === [] || count($members) > 20 || count($members) !== count(array_unique($members)) || in_array($input['coordinator'], $members, true)) {
+        if ($members === [] || count($members) > 20 || count($memberKeys) !== count(array_unique($memberKeys)) || in_array($coordinatorKey, $memberKeys, true)) {
             throw ValidationException::withMessages(['members' => 'Isi 1–20 petugas yang berbeda, satu nama per baris. Penanggung jawab tidak perlu diulang.']);
         }
-        if ($employeeNames !== [] && (! in_array($input['coordinator'], $employeeNames, true) || array_diff($members, $employeeNames) !== [])) {
+        $employeeKeys = array_map($this->personNameKey(...), $employeeNames);
+        if ($employeeNames !== [] && (! in_array($coordinatorKey, $employeeKeys, true) || array_diff($memberKeys, $employeeKeys) !== [])) {
             throw ValidationException::withMessages(['members' => 'Penanggung jawab dan petugas harus dipilih dari daftar pegawai aktif.']);
         }
         foreach ($members as $member) {
@@ -296,7 +300,7 @@ class CounterDutyController extends Controller
             }
         }
 
-        $dutyGroup->update(['coordinator' => $input['coordinator'], 'members' => $members]);
+        $dutyGroup->update(['coordinator' => $coordinator, 'members' => $members]);
         CeremonySchedule::query()
             ->where('type', 'piket_loket')
             ->where('duty_group_id', $dutyGroup->id)
@@ -554,5 +558,15 @@ class CounterDutyController extends Controller
     private function ensureCanManage(Request $request): void
     {
         abort_unless($request->user()->isSuperAdmin(), 403);
+    }
+
+    private function normalizePersonName(string $name): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', $name));
+    }
+
+    private function personNameKey(string $name): string
+    {
+        return mb_strtolower($this->normalizePersonName($name));
     }
 }
