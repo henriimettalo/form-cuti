@@ -2693,6 +2693,15 @@ if (employeeImportForm) {
 const employeePerPageSelect = document.querySelector('[data-employee-per-page]');
 const employeeFilterForm = document.querySelector('#employee-filter-form');
 const employeeSearchInput = employeeFilterForm?.querySelector('#search');
+const employeeSearchFocusKey = 'employee-search-restore-focus';
+
+if (employeeSearchInput && window.sessionStorage.getItem(employeeSearchFocusKey) === '1') {
+    window.sessionStorage.removeItem(employeeSearchFocusKey);
+    window.requestAnimationFrame(() => {
+        employeeSearchInput.focus();
+        employeeSearchInput.setSelectionRange(employeeSearchInput.value.length, employeeSearchInput.value.length);
+    });
+}
 
 if (employeeFilterForm && employeeSearchInput) {
     let employeeSearchTimeout;
@@ -2704,6 +2713,7 @@ if (employeeFilterForm && employeeSearchInput) {
         if (search.length > 0 && search.length < 2) return;
 
         employeeSearchTimeout = window.setTimeout(() => {
+            window.sessionStorage.setItem(employeeSearchFocusKey, '1');
             employeeFilterForm.requestSubmit();
         }, 350);
     });
