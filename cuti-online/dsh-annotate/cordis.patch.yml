@@ -1,0 +1,18 @@
+# The dsh-annotate bundle patch layer.
+#
+# Inserted over the profile tree built by @deepseek-ai/dsh-base. Every row is
+# addressed by `id`, so the user's own cordis.patch.yml can override any of
+# them later (for example `- id: annotate disabled: true`).
+#
+# Row order carries no load semantics: activation is service-availability
+# driven. Grouping exists for readers.
+
+- insert:
+    # The service row: owns the annotation store and the tool-facing API.
+    - id: annotate
+      name: dsh-annotate
+
+    # The tool row: exposes the annotate tool to the agent loop. Kept separate
+    # so a profile can drop the tool while keeping the service.
+    - id: tool-annotate
+      name: dsh-annotate/src/tool.js

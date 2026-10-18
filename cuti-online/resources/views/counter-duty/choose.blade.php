@@ -19,4 +19,10 @@
             <span class="btn-primary mt-5 inline-flex">Lihat jadwal kelurahan</span>
         </a>
     </section>
+    @if (auth()->user()->isSuperAdmin())
+        <section class="mt-7 flex flex-col gap-3 sm:flex-row">
+            <a class="btn-secondary" href="{{ route('counter-duty.import.create') }}">Impor Excel tahun N</a>
+            <a class="btn-secondary" href="{{ route('counter-duty.generate') }}">Buat jadwal otomatis</a>
+        </section>
+    @endif
 @endsection

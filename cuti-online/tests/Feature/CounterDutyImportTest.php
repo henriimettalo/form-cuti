@@ -32,6 +32,8 @@ class CounterDutyImportTest extends TestCase
         }
         $this->actingAs(User::factory()->create())->get(route('counter-duty.index'))
             ->assertOk()->assertSee('Impor Excel tahun N');
+        $this->get(route('counter-duty.index', ['tab' => 'agenda']))
+            ->assertOk()->assertDontSee('Impor Excel tahun N');
         $this->get(route('counter-duty.import.create'))->assertOk()->assertSee('Tahun impor');
     }
 

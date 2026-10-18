@@ -43,7 +43,10 @@ class CounterDutyTest extends TestCase
             $this->actingAs($user)->get(route('counter-duty.index', ['tab' => 'groups']))
                 ->assertOk()->assertSee('Syaiful Rahman')->assertSee('Harry Salistiwa');
             $this->get(route('counter-duty.index', ['tab' => 'holidays']))->assertOk();
-            $this->get(route('counter-duty.index'))->assertOk();
+            $this->get(route('counter-duty.index'))
+                ->assertOk()
+                ->assertSee('Piket Kecamatan')
+                ->assertSee('Piket Kelurahan');
             if ($role !== User::ROLE_SUPER_ADMIN) {
                 $this->get(route('counter-duty.generate'))->assertForbidden();
                 $this->post(route('counter-duty.preview'), $this->range())->assertForbidden();
@@ -130,6 +133,7 @@ class CounterDutyTest extends TestCase
 
     public function test_marking_a_scheduled_day_as_holiday_removes_it_and_recalculates_following_groups(): void
     {
+        $this->travelTo(Carbon::parse('2026-10-01', 'Asia/Pontianak'));
         $this->actingAs(User::factory()->create());
         $groups = DutyGroup::query()->orderBy('number')->get();
         foreach (['2026-10-07' => 1, '2026-10-08' => 2, '2026-10-09' => 3, '2026-10-12' => 4] as $date => $number) {
@@ -153,10 +157,11 @@ class CounterDutyTest extends TestCase
         $this->assertDatabaseHas('ceremony_schedules', ['type' => 'piket_loket', 'event_date' => '2026-10-07', 'duty_group_id' => $groups[0]->id]);
         $this->assertDatabaseHas('ceremony_schedules', ['type' => 'piket_loket', 'event_date' => '2026-10-08', 'duty_group_id' => $groups[1]->id]);
         $this->assertDatabaseHas('ceremony_schedules', ['type' => 'piket_loket', 'event_date' => '2026-10-12', 'duty_group_id' => $groups[2]->id]);
-        $this->get(route('counter-duty.index', ['month' => '2026-10']))
+        $this->get(route('counter-duty.index', ['tab' => 'agenda', 'month' => '2026-10']))
             ->assertOk()
             ->assertDontSee('Jum, 09 Okt 2026')
             ->assertSee('Kelompok 3');
+        $this->travelBack();
     }
 
     public function test_backdated_holiday_changes_do_not_modify_past_schedule_snapshots(): void
@@ -211,7 +216,7 @@ class CounterDutyTest extends TestCase
         $this->assertSame($admin->id, $first->created_by);
         $this->assertSame('2026-10-02', $first->duty_date->toDateString());
         $this->assertSame('Drs. Ridwan', $first->duty_roster['coordinator']);
-        $this->get(route('counter-duty.index', ['month' => '2026-10']))->assertOk()->assertSee('Harry Salistiwa')->assertSee('Kelompok 4')->assertSee('Akhir pekan');
+        $this->get(route('counter-duty.index', ['tab' => 'agenda', 'month' => '2026-10']))->assertOk()->assertSee('Harry Salistiwa')->assertSee('Kelompok 4')->assertSee('Akhir pekan');
         $this->get(route('ceremony-schedules.index', ['month' => '2026-10']))->assertOk()->assertDontSee('Kelompok 4')->assertDontSee('Drs. Ridwan');
     }
 
@@ -226,7 +231,7 @@ class CounterDutyTest extends TestCase
         ]);
 
         $this->actingAs(User::factory()->create())
-            ->get(route('counter-duty.index', ['month' => '2026-10']))
+            ->get(route('counter-duty.index', ['tab' => 'agenda', 'month' => '2026-10']))
             ->assertOk()
             ->assertSee('Libur bersama');
     }
@@ -271,6 +276,7 @@ class CounterDutyTest extends TestCase
 
     public function test_changing_groups_updates_future_saved_rosters(): void
     {
+        $this->travelTo(Carbon::parse('2026-10-01', 'Asia/Pontianak'));
         $this->actingAs(User::factory()->create());
         $group = DutyGroup::query()->findOrFail(2);
         $schedule = CeremonySchedule::query()->create([
@@ -290,6 +296,7 @@ class CounterDutyTest extends TestCase
         $schedule = $schedule->fresh();
         $this->assertSame('Koordinator Baru', $schedule->duty_roster['coordinator']);
         $this->assertSame(['Petugas Baru', 'Petugas Kedua'], $schedule->duty_roster['members']);
+        $this->travelBack();
     }
 
     public function test_holiday_or_new_schedule_after_preview_prevents_stale_save(): void

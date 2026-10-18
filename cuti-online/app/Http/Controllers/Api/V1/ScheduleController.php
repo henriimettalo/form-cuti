@@ -21,7 +21,7 @@ class ScheduleController extends Controller
 
     public function counterDuty(Request $request): AnonymousResourceCollection
     {
-        return $this-> schedules($request, ['piket_loket']);
+        return $this->schedules($request, ['piket_loket']);
     }
 
     public function counterDutyReminder(Request $request): JsonResponse
@@ -32,7 +32,7 @@ class ScheduleController extends Controller
         $label = $isToday ? 'Hari Ini' : $date->locale('id')->translatedFormat('j F Y');
         $schedules = CeremonySchedule::query()->with('dutyGroup')
             ->where('type', 'piket_loket')->whereNull('department_id')
-            ->whereDate('event_date', $date->toDateString())
+            ->where('event_date', $date->toDateString())
             ->where(fn ($query) => $query->whereNull('notes')->orWhere('notes', '!=', 'Libur bersama'))
             ->orderBy('start_time')->orderBy('id')->get();
         $data = $schedules->map(function (CeremonySchedule $schedule) use ($isToday, $label): array {
@@ -58,7 +58,7 @@ class ScheduleController extends Controller
         $date = $this->reminderDate($request);
         $label = $date->isSameDay(CarbonImmutable::today('Asia/Pontianak')) ? 'Hari Ini' : $date->locale('id')->translatedFormat('j F Y');
         $data = CeremonySchedule::query()->with('department')->whereIn('type', ['apel', 'upacara'])
-            ->whereDate('event_date', $date->toDateString())
+            ->where('event_date', $date->toDateString())
             ->where(fn ($query) => $query->whereNull('notes')->orWhere('notes', '!=', 'Libur bersama'))
             ->orderBy('start_time')->orderBy('id')->get()
             ->map(function (CeremonySchedule $schedule) use ($label): array {
@@ -87,7 +87,7 @@ class ScheduleController extends Controller
         $date = $this->reminderDate($request);
         $label = $date->isSameDay(CarbonImmutable::today('Asia/Pontianak')) ? 'Hari Ini' : $date->locale('id')->translatedFormat('j F Y');
         $data = KelurahanDutySchedule::query()->with('department')
-            ->whereDate('event_date', $date->toDateString())
+            ->where('event_date', $date->toDateString())
             ->whereHas('department', fn ($query) => $query->where('department_type', 'kelurahan')->where('is_active', true))
             ->orderBy('department_id')->orderBy('group_number')->orderBy('id')->get()
             ->map(function (KelurahanDutySchedule $schedule) use ($label): array {
@@ -131,7 +131,7 @@ class ScheduleController extends Controller
     }
 
     /**
-     * @param array<int, string> $types
+     * @param  array<int, string>  $types
      */
     private function schedules(Request $request, array $types): AnonymousResourceCollection
     {
@@ -149,8 +149,8 @@ class ScheduleController extends Controller
                 $period = CarbonImmutable::createFromFormat('!Y-m', $month, 'Asia/Pontianak');
                 $query->whereBetween('event_date', [$period->toDateString(), $period->endOfMonth()->toDateString()]);
             })
-            ->when($data['date_from'] ?? null, fn ($query, string $date) => $query->whereDate('event_date', '>=', $date))
-            ->when($data['date_to'] ?? null, fn ($query, string $date) => $query->whereDate('event_date', '<=', $date))
+            ->when($data['date_from'] ?? null, fn ($query, string $date) => $query->where('event_date', '>=', $date))
+            ->when($data['date_to'] ?? null, fn ($query, string $date) => $query->where('event_date', '<=', $date))
             ->orderBy('event_date')
             ->orderBy('start_time')
             ->orderBy('id')

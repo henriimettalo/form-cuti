@@ -11,7 +11,7 @@ Aplikasi web pengelolaan data pegawai, pengajuan cuti, dan payroll untuk lingkun
 - **Template dokumen** — unggah template Word formulir cuti.
 - **Profil instansi** — nama instansi dipakai pada formulir.
 - **Jadwal Kegiatan** — agenda bulanan untuk Apel / Upacara (satu jenis kegiatan) dan Piket Loket, dengan nama kegiatan, tanggal, unit petugas, dan catatan. Waktu mulai, lokasi, dan pembina tidak perlu diisi; data lama tetap tersimpan tanpa ditampilkan. Jadwal apel serta upacara lama tetap tampil dalam filter gabungan. Semua pengguna dapat melihat; Super Admin dapat menambah, mengedit, dan menghapus jadwal.
-- **Piket Loket & Kelompok** — empat kelompok awal mengikuti daftar ref yang dikonfirmasi. Kelola penanggung jawab dan petugas sekali per kelompok, tetapkan libur tambahan, lalu periksa dan simpan rotasi harian. Akhir pekan dan hari libur dilewati; giliran berlanjut antarbulan. Kalender libur tidak diisi otomatis. Jadwal tersimpan menyimpan susunan petugas saat dibuat dan tidak ditimpa oleh generator.
+- **Piket Loket & Kelompok** — halaman `/jadwal-piket-loket` menampilkan pilihan **Piket Kecamatan** dan **Piket Kelurahan**; jalur Impor Excel serta pembuatan jadwal otomatis tersedia di halaman pilihan tersebut bagi Super Admin. Empat kelompok awal mengikuti daftar ref yang dikonfirmasi. Kelola penanggung jawab dan petugas sekali per kelompok, tetapkan libur tambahan, lalu periksa dan simpan rotasi harian. Akhir pekan dan hari libur dilewati; giliran berlanjut antarbulan. Kalender libur tidak diisi otomatis. Jadwal tersimpan menyimpan susunan petugas saat dibuat dan tidak ditimpa oleh generator.
 - **Impor piket tahun N** — unggah Excel .xlsx dengan kolom Tanggal Piket dan Kelompok Yang Piket di sheet jadwal_piket (atau sheet pertama). Tahun menyaring tanggal asli, bukan mengganti tahun. Nomor kelompok mengikuti Excel; nama petugas memakai susunan kelompok ref di aplikasi. Pratinjau menampilkan baris di luar tahun, jadwal existing yang dilewati, akhir pekan, serta konflik libur. Semua baris bermasalah harus diperbaiki sebelum konfirmasi. Impor tidak menimpa jadwal existing dan tidak mengimpor kalender libur.
 - **Kalender libur tahunan** — tab Hari libur menampilkan seluruh tanggal hari kerja 1 Januari–31 Desember pada tahun yang dipilih (termasuk tahun kabisat). Kolom isLibur berupa teks: ya atau 1 berarti libur; kosong, tidak, atau 0 berarti hari kerja. Huruf besar/kecil dan spasi diabaikan. Simpan kalender untuk menyimpan sekaligus. Tanda hari kerja menghapus libur sebelumnya pada tanggal tersebut. Nama libur yang masih dipilih dan data tahun lain dipertahankan. Perubahan yang berbenturan dengan jadwal piket existing ditolak tanpa menyimpan sebagian perubahan.
 
@@ -93,6 +93,8 @@ php artisan test
 | `resources/views/` | Blade views |
 | `database/migrations/` | Skema DB |
 | `routes/web.php` | Route aplikasi |
+
+> **Perbandingan tanggal di query.** Kolom tanggal (`event_date`, `duty_date`, `holiday_date`, `effective_on`) disimpan sebagai teks `Y-m-d`. Untuk filter rentang gunakan `->where('event_date', '>=', $date)` dengan string tanggal, **bukan** `whereDate()` — pada SQLite `strftime()` di kolom teks tidak dibandingkan secara leksikografis oleh operator `>=`, sehingga `whereDate()` bisa mengembalikan hasil kosong tanpa error.
 
 ## Replikasi ke kecamatan lain
 

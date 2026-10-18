@@ -121,6 +121,7 @@ class CounterDutyController extends Controller
     public function editKelurahanSchedule(Request $request, KelurahanDutySchedule $kelurahanDutySchedule): View
     {
         $this->ensureCanManage($request);
+
         return view('counter-duty.kelurahan-schedule-form', [
             'month' => CarbonImmutable::now('Asia/Pontianak'),
             'kelurahans' => collect([$kelurahanDutySchedule->department]),
@@ -145,8 +146,11 @@ class CounterDutyController extends Controller
         }
         $ids = array_values(array_unique([(int) $input['coordinator_employee_id'], ...array_map('intval', $input['member_employee_ids'])]));
         $employees = Employee::query()->whereIn('id', $ids)->where('is_active', true)->where('department_id', $kelurahanDutySchedule->department_id)->get(['id', 'full_name'])->keyBy('id');
-        if ($employees->count() !== count($ids)) throw ValidationException::withMessages(['coordinator_employee_id' => 'Pilih pegawai aktif dari kelurahan yang sama.']);
+        if ($employees->count() !== count($ids)) {
+            throw ValidationException::withMessages(['coordinator_employee_id' => 'Pilih pegawai aktif dari kelurahan yang sama.']);
+        }
         $kelurahanDutySchedule->update(['coordinator' => $employees[(int) $input['coordinator_employee_id']]->full_name, 'members' => collect($input['member_employee_ids'])->map(fn ($id) => $employees[(int) $id]->full_name)->values()->all()]);
+
         return to_route('counter-duty.kelurahan-assignments')->with('status', 'Kelompok '.$kelurahanDutySchedule->group_number.' '.$kelurahanDutySchedule->department->name.' berhasil diperbarui.');
     }
 
@@ -155,6 +159,7 @@ class CounterDutyController extends Controller
         $this->ensureCanManage($request);
         $label = 'Kelompok '.$kelurahanDutySchedule->group_number.' '.$kelurahanDutySchedule->department->name;
         $kelurahanDutySchedule->delete();
+
         return to_route('counter-duty.kelurahan-assignments')->with('status', $label.' berhasil dihapus.');
     }
 
@@ -188,6 +193,7 @@ class CounterDutyController extends Controller
         ]);
 
         $department = Department::query()->findOrFail($input['department_id']);
+
         return to_route('counter-duty.kelurahan-schedules.create', [
             'month' => $request->input('month', now('Asia/Pontianak')->format('Y-m')),
             'department_id' => $input['department_id'],
@@ -263,8 +269,8 @@ class CounterDutyController extends Controller
                 ->where(function ($query): void {
                     $query->whereNull('notes')->orWhere('notes', '!=', 'Libur bersama');
                 })
-                ->whereDate('event_date', '>=', $month->toDateString())
-                ->whereDate('event_date', '<=', $month->endOfMonth()->toDateString())
+                ->where('event_date', '>=', $month->toDateString())
+                ->where('event_date', '<=', $month->endOfMonth()->toDateString())
                 ->orderBy('event_date')->orderBy('id')->paginate(31)->withQueryString(),
             'monthSchedules' => CeremonySchedule::query()->where('type', 'piket_loket')
                 ->whereYear('event_date', $month->year)->whereMonth('event_date', $month->month)
@@ -304,7 +310,7 @@ class CounterDutyController extends Controller
         CeremonySchedule::query()
             ->where('type', 'piket_loket')
             ->where('duty_group_id', $dutyGroup->id)
-            ->whereDate('event_date', '>=', now('Asia/Pontianak')->toDateString())
+            ->where('event_date', '>=', now('Asia/Pontianak')->toDateString())
             ->where(function ($query): void {
                 $query->whereNull('notes')->orWhere('notes', '!=', 'Libur bersama');
             })
@@ -326,12 +332,15 @@ class CounterDutyController extends Controller
             'coordinator' => ['required', 'string', 'max:255'],
             'members' => ['required', 'string', 'max:5000'],
         ], [], ['coordinator' => 'penanggung jawab', 'members' => 'petugas piket']);
-        $members = array_values(array_filter(array_map('trim', preg_split('/\R/u', $input['members']))));
-        if ($members === [] || count($members) > 20 || count($members) !== count(array_unique($members)) || in_array($input['coordinator'], $members, true)) {
+        $coordinator = $this->normalizePersonName($input['coordinator']);
+        $members = array_values(array_filter(array_map(fn ($name) => $this->normalizePersonName($name), preg_split('/\R/u', $input['members']))));
+        $memberKeys = array_map($this->personNameKey(...), $members);
+        $coordinatorKey = $this->personNameKey($coordinator);
+        if ($members === [] || count($members) > 20 || count($memberKeys) !== count(array_unique($memberKeys)) || in_array($coordinatorKey, $memberKeys, true)) {
             throw ValidationException::withMessages(['members' => 'Isi 1–20 petugas yang berbeda dan penanggung jawab tidak perlu diulang.']);
         }
         $number = ((int) DutyGroup::query()->max('number')) + 1;
-        DutyGroup::query()->create(['number' => $number, 'coordinator' => $input['coordinator'], 'members' => $members]);
+        DutyGroup::query()->create(['number' => $number, 'coordinator' => $coordinator, 'members' => $members]);
 
         return to_route('counter-duty.index', ['tab' => 'groups'])->with('status', "Kelompok {$number} ditambahkan.");
     }
@@ -344,7 +353,7 @@ class CounterDutyController extends Controller
             'name' => ['required', 'string', 'max:255'],
         ], [], ['holiday_date' => 'tanggal libur', 'name' => 'keterangan libur']);
 
-        if (CeremonySchedule::query()->where('type', 'piket_loket')->whereDate('event_date', $input['holiday_date'])->exists()) {
+        if (CeremonySchedule::query()->where('type', 'piket_loket')->where('event_date', $input['holiday_date'])->exists()) {
             throw ValidationException::withMessages(['holiday_date' => 'Tanggal ini sudah memiliki jadwal piket. Hapus jadwal tersebut sebelum menetapkan hari libur bersama.']);
         }
 
@@ -446,7 +455,7 @@ class CounterDutyController extends Controller
     private function recalculateCounterDutySchedules(array $changedDates): void
     {
         $today = now('Asia/Pontianak')->toDateString();
-        $changedDates = array_values(array_filter($changedDates, fn ($date) => $date >= $today));
+        $changedDates = array_values(array_filter($changedDates, fn (string $date) => $date >= $today));
         if ($changedDates === []) {
             return;
         }
@@ -458,13 +467,13 @@ class CounterDutyController extends Controller
             return;
         }
         $schedules = CeremonySchedule::query()->where('type', 'piket_loket')
-            ->whereDate('event_date', '>=', $firstChangedDate)
+            ->where('event_date', '>=', $firstChangedDate)
             ->orderBy('event_date')->orderBy('id')->lockForUpdate()->get()
             ->keyBy(fn ($schedule) => $schedule->event_date->toDateString());
-        $holidays = DutyHoliday::query()->whereDate('holiday_date', '>=', $firstChangedDate)
+        $holidays = DutyHoliday::query()->where('holiday_date', '>=', $firstChangedDate)
             ->pluck('holiday_date')->map(fn ($date) => CarbonImmutable::parse($date)->toDateString())->flip();
         $previous = CeremonySchedule::query()->where('type', 'piket_loket')
-            ->whereDate('event_date', '<', $firstChangedDate)->orderByDesc('event_date')->orderByDesc('id')->first();
+            ->where('event_date', '<', $firstChangedDate)->orderByDesc('event_date')->orderByDesc('id')->first();
         $nextNumber = $previous?->duty_roster
             ? (((int) $previous->duty_roster['number'] % $groups->count()) + 1)
             : (int) ($groups->first()->number);
@@ -478,15 +487,20 @@ class CounterDutyController extends Controller
             $dateKey = $date->toDateString();
             $schedule = $schedules->get($dateKey);
             if ($holidays->has($dateKey)) {
-                if ($schedule) {
-                    $schedule->update([
+                if (! $schedule) {
+                    $schedule = CeremonySchedule::query()->create([
                         'title' => 'Piket Loket — Libur',
-                        'duty_group_id' => null,
-                        'duty_roster' => null,
-                        'duty_date' => $dateKey,
-                        'notes' => 'Libur bersama',
+                        'type' => 'piket_loket',
+                        'event_date' => $dateKey,
                     ]);
                 }
+                $schedule->update([
+                    'title' => 'Piket Loket — Libur',
+                    'duty_group_id' => null,
+                    'duty_roster' => null,
+                    'duty_date' => $dateKey,
+                    'notes' => 'Libur bersama',
+                ]);
 
                 continue;
             }

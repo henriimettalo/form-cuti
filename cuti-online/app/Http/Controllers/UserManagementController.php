@@ -194,7 +194,7 @@ class UserManagementController extends Controller
             'department_phone' => ['nullable', 'string', 'max:32'],
             'admin_name' => ['required', 'string', 'max:255'],
             'admin_email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
-            'admin_password' => ['required', 'string', 'min:8', 'confirmed'],
+            'admin_password' => ['required', 'string', 'min:12', 'confirmed'],
         ]);
 
         $departmentCode = $this->normalizeDepartmentCode(
@@ -371,7 +371,7 @@ class UserManagementController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', 'min:12', 'confirmed'],
         ]);
 
         User::query()->create([

@@ -26,10 +26,10 @@ class DashboardController extends Controller
                 ->count(),
             'careerChangeCount' => EmployeeRankHistory::query()
                 ->whereHas('employee', fn (Builder $query) => $query->visibleTo($user))
-                ->whereDate('effective_on', '>=', now()->startOfMonth())
+                ->where('effective_on', '>=', now('Asia/Pontianak')->startOfMonth()->toDateString())
                 ->count() + EmployeePositionHistory::query()
                 ->whereHas('employee', fn (Builder $query) => $query->visibleTo($user))
-                ->whereDate('effective_on', '>=', now()->startOfMonth())
+                ->where('effective_on', '>=', now('Asia/Pontianak')->startOfMonth()->toDateString())
                 ->count(),
             'requestCount' => LeaveRequest::query()->visibleTo($user)->count(),
             'documentCount' => GeneratedDocument::query()

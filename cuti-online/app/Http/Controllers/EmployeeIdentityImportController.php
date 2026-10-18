@@ -48,7 +48,7 @@ class EmployeeIdentityImportController extends Controller
             return back()->withErrors(['file' => $exception->getMessage()]);
         }
 
-        $path = $file->storeAs('identity-imports', $file->getClientOriginalName(), 'local');
+        $path = $file->store('identity-imports', 'local');
 
         if ($path === false) {
             return back()->withErrors(['file' => 'File tidak dapat disimpan untuk diproses.']);

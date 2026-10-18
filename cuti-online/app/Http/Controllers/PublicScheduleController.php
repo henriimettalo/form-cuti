@@ -50,8 +50,8 @@ class PublicScheduleController extends Controller
             ->with(['department', 'dutyGroup'])
             ->where('type', $tab === 'apel' ? 'apel' : 'piket_loket')
             ->when($tab === 'piket', fn ($query) => $query->whereNull('department_id'))
-            ->whereDate('event_date', '>=', $month->toDateString())
-            ->whereDate('event_date', '<=', $month->endOfMonth()->toDateString())
+            ->where('event_date', '>=', $month->toDateString())
+            ->where('event_date', '<=', $month->endOfMonth()->toDateString())
             ->where(function ($query): void {
                 $query->whereNull('notes')->orWhere('notes', '!=', 'Libur bersama');
             })

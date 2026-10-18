@@ -7,8 +7,8 @@ use App\Models\Department;
 use App\Models\DutyGroup;
 use App\Models\DutyHoliday;
 use Carbon\CarbonImmutable;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -34,8 +34,8 @@ class CeremonyScheduleController extends Controller
         $schedules = CeremonySchedule::query()
             ->with('department')
             ->whereIn('type', ['apel', 'upacara'])
-            ->whereDate('event_date', '>=', $month->toDateString())
-            ->whereDate('event_date', '<=', $month->endOfMonth()->toDateString())
+            ->where('event_date', '>=', $month->toDateString())
+            ->where('event_date', '<=', $month->endOfMonth()->toDateString())
             ->when($type, fn ($query) => $query->whereIn('type', $type === 'apel' ? ['apel', 'upacara'] : [$type]))
             ->orderBy('event_date')
             ->orderBy('id')
@@ -89,7 +89,7 @@ class CeremonyScheduleController extends Controller
         $today = now('Asia/Pontianak')->toDateString();
         $pastDates = array_filter($expectedDates, fn ($date) => $date < $today);
         foreach ($pastDates as $date) {
-            $existing = CeremonySchedule::query()->where('type', 'apel')->whereDate('event_date', $date)->first();
+            $existing = CeremonySchedule::query()->where('type', 'apel')->where('event_date', $date)->first();
             $submitted = $input['days'][$date];
             if ($existing && ((int) ($submitted['group_number'] ?? 0) !== (int) ($existing->ceremony_group_number ?? 0) || (int) ($submitted['department_id'] ?? 0) !== (int) ($existing->department_id ?? 0))) {
                 throw ValidationException::withMessages(["days.{$date}.group_number" => 'Jadwal apel yang sudah lewat tidak dapat diubah.']);
@@ -156,7 +156,7 @@ class CeremonyScheduleController extends Controller
 
             CeremonySchedule::query()
                 ->where('type', 'apel')
-                ->whereDate('event_date', '>=', now('Asia/Pontianak')->toDateString())
+                ->where('event_date', '>=', now('Asia/Pontianak')->toDateString())
                 ->whereNotNull('ceremony_group_number')
                 ->get()
                 ->each(function (CeremonySchedule $schedule) use ($groupDepartments): void {
@@ -331,10 +331,10 @@ class CeremonyScheduleController extends Controller
             }
         }
         if ($data['type'] === 'piket_loket') {
-            if (DutyHoliday::query()->whereDate('holiday_date', $data['event_date'])->exists()) {
+            if (DutyHoliday::query()->where('holiday_date', $data['event_date'])->exists()) {
                 throw ValidationException::withMessages(['event_date' => 'Tanggal ini ditetapkan sebagai hari libur piket.']);
             }
-            if (CeremonySchedule::query()->where('type', 'piket_loket')->whereDate('event_date', $data['event_date'])
+            if (CeremonySchedule::query()->where('type', 'piket_loket')->where('event_date', $data['event_date'])
                 ->when($schedule, fn ($query) => $query->where('id', '!=', $schedule->id))->exists()) {
                 throw ValidationException::withMessages(['event_date' => 'Sudah ada jadwal piket pada tanggal ini. Edit jadwal yang tersedia.']);
             }

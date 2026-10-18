@@ -19,17 +19,17 @@ class CounterDutyScheduleService
         $end = CarbonImmutable::parse($input['end_date'], 'Asia/Pontianak')->startOfDay();
         $groups = DutyGroup::query()->orderBy('number')->get();
         $previous = CeremonySchedule::query()->where('type', 'piket_loket')
-            ->whereDate('event_date', '<', $start->toDateString())->orderByDesc('event_date')->orderByDesc('id')->first();
+            ->where('event_date', '<', $start->toDateString())->orderByDesc('event_date')->orderByDesc('id')->first();
 
         if ($previous && ! $previous->duty_roster) {
             throw ValidationException::withMessages(['start_date' => 'Tentukan kelompok pada jadwal piket sebelumnya ('.$previous->event_date->format('d/m/Y').') sebelum melanjutkan rotasi.']);
         }
 
         $nextNumber = $previous ? ($previous->duty_roster['number'] % $groups->count()) + 1 : (int) $input['starting_group'];
-        $holidays = DutyHoliday::query()->whereDate('holiday_date', '>=', $start->toDateString())->whereDate('holiday_date', '<=', $end->toDateString())
+        $holidays = DutyHoliday::query()->where('holiday_date', '>=', $start->toDateString())->where('holiday_date', '<=', $end->toDateString())
             ->get()->keyBy(fn ($holiday) => $holiday->holiday_date->toDateString());
         $existing = CeremonySchedule::query()->where('type', 'piket_loket')
-            ->whereDate('event_date', '>=', $start->toDateString())->whereDate('event_date', '<=', $end->toDateString())->get()
+            ->where('event_date', '>=', $start->toDateString())->where('event_date', '<=', $end->toDateString())->get()
             ->groupBy(fn ($schedule) => $schedule->event_date->toDateString());
         $rows = [];
 
@@ -63,7 +63,7 @@ class CounterDutyScheduleService
         $newRows = array_filter($rows, fn ($row) => $row['status'] === 'new');
         if ($newRows !== []) {
             $lastNewDate = max(array_column($newRows, 'date'));
-            if (CeremonySchedule::query()->where('type', 'piket_loket')->whereDate('event_date', '>', $lastNewDate)->exists()) {
+            if (CeremonySchedule::query()->where('type', 'piket_loket')->where('event_date', '>', $lastNewDate)->exists()) {
                 throw ValidationException::withMessages(['start_date' => 'Sudah ada jadwal setelah rentang ini. Tambahkan jadwal setelah jadwal terakhir agar urutan rotasi tidak berubah.']);
             }
         }

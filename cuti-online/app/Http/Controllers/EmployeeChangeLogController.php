@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Employee;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -61,8 +62,8 @@ class EmployeeChangeLogController extends Controller
                         });
                 });
             })
-            ->when($input['from'] ?? null, fn ($query, string $from) => $query->whereDate('created_at', '>=', $from))
-            ->when($input['to'] ?? null, fn ($query, string $to) => $query->whereDate('created_at', '<=', $to))
+            ->when($input['from'] ?? null, fn ($query, string $from) => $query->where('created_at', '>=', CarbonImmutable::parse($from, 'Asia/Pontianak')->startOfDay()))
+            ->when($input['to'] ?? null, fn ($query, string $to) => $query->where('created_at', '<=', CarbonImmutable::parse($to, 'Asia/Pontianak')->endOfDay()))
             ->latest('created_at')
             ->paginate(25)
             ->withQueryString();

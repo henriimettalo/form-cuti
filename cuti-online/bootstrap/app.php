@@ -17,7 +17,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Aplikasi hanya menerima trafik melalui Nginx VPS dan Nginx container.
         // Header X-Forwarded-* diperlukan agar URL HTTPS dan cookie aman terbaca benar.
-        $middleware->trustProxies(at: '*');
+        // Batasi proxy yang dipercaya ke alamat privat/loopback agar klien tidak bisa
+        // memalsukan X-Forwarded-Host/Proto/For. Override lewat TRUSTED_PROXIES.
+        $middleware->trustProxies(at: array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('TRUSTED_PROXIES', '127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16')),
+        ))));
 
         $middleware->alias([
             'abilities' => CheckAbilities::class,
