@@ -26,3 +26,6 @@ storage/logs
 database/*.sqlite
 tests
 docs
+
+.tmp-annotate
+dsh-annotate
