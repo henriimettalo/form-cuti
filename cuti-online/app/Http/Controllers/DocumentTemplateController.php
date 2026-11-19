@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\DocumentTemplate;
-use App\Services\LeaveTemplatePlaceholderResolver;
 use App\Rules\SafeUpload;
+use App\Services\LeaveDocxTemplateInspector;
+use App\Services\LeaveTemplatePlaceholderResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -13,7 +14,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use ZipArchive;
 
 class DocumentTemplateController extends Controller
 {
@@ -28,7 +28,7 @@ class DocumentTemplateController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, LeaveDocxTemplateInspector $inspector): RedirectResponse
     {
         $data = $request->validate([
             'name' => ['nullable', 'string', 'max:255'],
@@ -37,7 +37,10 @@ class DocumentTemplateController extends Controller
 
         /** @var UploadedFile $file */
         $file = $data['file'];
-        $this->ensureWordDocument($file);
+        $path = $file->getRealPath();
+        if ($path === false || ! $inspector->accepts($path)) {
+            throw ValidationException::withMessages(['file' => LeaveDocxTemplateInspector::REJECTION_MESSAGE]);
+        }
 
         $name = trim((string) ($data['name'] ?? ''));
         $name = $name !== '' ? $name : pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
@@ -76,25 +79,5 @@ class DocumentTemplateController extends Controller
 
         return to_route('document-templates.index')
             ->with('status', 'Template aktif untuk formulir cuti baru berhasil diubah.');
-    }
-
-    private function ensureWordDocument(UploadedFile $file): void
-    {
-        $path = $file->getRealPath();
-        $archive = new ZipArchive;
-        $opened = $path !== false && $archive->open($path) === true;
-        $isValid = $opened
-            && $archive->locateName('[Content_Types].xml') !== false
-            && $archive->locateName('word/document.xml') !== false;
-
-        if ($opened) {
-            $archive->close();
-        }
-
-        if (! $isValid) {
-            throw ValidationException::withMessages([
-                'file' => 'File harus berupa dokumen Word (.docx) yang valid.',
-            ]);
-        }
     }
 }

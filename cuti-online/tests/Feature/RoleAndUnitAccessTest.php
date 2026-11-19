@@ -9,6 +9,7 @@ use App\Models\LeaveType;
 use App\Models\Official;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class RoleAndUnitAccessTest extends TestCase
@@ -481,6 +482,39 @@ class RoleAndUnitAccessTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_leave_records_and_downloads_follow_the_employee_unit(): void
+    {
+        Storage::fake('local');
+        $ownUnit = $this->department('Unit Asal');
+        $otherUnit = $this->department('Unit Lain');
+        $employee = $this->employee($ownUnit, '198001012015011001', 'Pegawai Uji');
+        $leaveType = LeaveType::query()->create([
+            'code' => 'annual',
+            'name' => 'Cuti Tahunan',
+            'requires_attachment' => false,
+            'is_active' => true,
+        ]);
+        $leave = $this->leaveRequest($employee, $leaveType);
+        $leave->update(['request_number' => 'CUTI-2026-000001']);
+        Storage::disk('local')->put('leave-documents/unit-test.docx', 'Dokumen contoh');
+        $document = $leave->generatedDocuments()->create([
+            'format' => 'docx',
+            'storage_path' => 'leave-documents/unit-test.docx',
+            'filename' => 'unit-test.docx',
+            'generated_at' => now(),
+        ]);
+
+        foreach ([User::ROLE_ADMIN_UNIT, User::ROLE_PENGGUNA] as $role) {
+            $this->actingAs(User::factory()->create(['role' => $role, 'department_id' => $otherUnit->id]));
+            $this->get(route('leave-requests.show', $leave))->assertNotFound();
+            $this->get(route('documents.download', $document))->assertNotFound();
+
+            $this->actingAs(User::factory()->create(['role' => $role, 'department_id' => $ownUnit->id]));
+            $this->get(route('leave-requests.show', $leave))->assertOk();
+            $this->get(route('documents.download', $document))->assertDownload('unit-test.docx');
+        }
+    }
+
     private function department(string $name): Department
     {
         return Department::query()->create([
@@ -511,7 +545,10 @@ class RoleAndUnitAccessTest extends TestCase
             'end_date' => '2026-08-12',
             'duration_value' => 1,
             'duration_unit' => 'day',
-            'employee_snapshot' => [],
+            'employee_snapshot' => [
+                'full_name' => $employee->full_name,
+                'nip' => $employee->nip,
+            ],
             'officials_snapshot' => [],
             'status' => 'generated',
         ]);

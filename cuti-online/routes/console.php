@@ -1,11 +1,13 @@
 <?php
 
 use App\Models\User;
+use App\Rules\AccountPassword;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Symfony\Component\Console\Command\Command;
 
@@ -16,10 +18,17 @@ Artisan::command('inspire', function () {
 Artisan::command('app:create-admin {name? : Nama lengkap administrator} {email? : Email administrator} {--password= : Kata sandi administrator}', function (?string $name = null, ?string $email = null) {
     $name ??= $this->ask('Nama administrator');
     $email ??= $this->ask('Email administrator');
-    $password = $this->option('password') ?: $this->secret('Kata sandi');
+    $password = $this->option('password') ?? $this->secret('Kata sandi');
 
     if (blank($name) || blank($email) || blank($password)) {
         $this->components->error('Nama, email, dan kata sandi wajib diisi.');
+
+        return Command::FAILURE;
+    }
+
+    $validator = Validator::make(['password' => $password], ['password' => AccountPassword::rules()]);
+    if ($validator->fails()) {
+        $this->components->error($validator->errors()->first('password'));
 
         return Command::FAILURE;
     }

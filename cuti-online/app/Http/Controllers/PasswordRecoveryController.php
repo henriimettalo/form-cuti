@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Rules\AccountPassword;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -10,7 +11,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rules\Password as PasswordRule;
 
 class PasswordRecoveryController extends Controller
 {
@@ -24,12 +24,7 @@ class PasswordRecoveryController extends Controller
         $input = $request->validate([
             'email' => ['required', 'email', 'max:255'],
             'token' => ['required', 'string', 'size:64'],
-            'password' => ['bail', 'required', 'confirmed', PasswordRule::min(12),
-                static function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (strlen($value) > 72) {
-                        $fail('Kata sandi tidak boleh melebihi 72 byte.');
-                    }
-                }],
+            'password' => [...AccountPassword::rules(), 'confirmed'],
         ]);
 
         $succeeded = Cache::lock('password-recovery:'.hash('sha256', Str::lower($input['email'])), 30)->get(

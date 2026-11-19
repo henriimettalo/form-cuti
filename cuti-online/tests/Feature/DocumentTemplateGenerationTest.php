@@ -36,7 +36,7 @@ class DocumentTemplateGenerationTest extends TestCase
                 'employee_id' => $employee->id,
                 'leave_type_id' => $leaveType->id,
                 'form_date' => '2026-07-27',
-                'reason' => 'Keperluan keluarga',
+                'reason' => 'Keperluan keluarga & kesehatan',
                 'start_date' => '2026-07-29',
                 'end_date' => '2026-07-30',
                 'duration_unit' => 'day',
@@ -60,7 +60,7 @@ class DocumentTemplateGenerationTest extends TestCase
 
         $this->assertStringContainsString('Pegawai Uji', $documentXml);
         $this->assertStringContainsString('197207151993032008', $documentXml);
-        $this->assertStringContainsString('Keperluan keluarga', $documentXml);
+        $this->assertStringContainsString('Keperluan keluarga &amp; kesehatan', $documentXml);
         $this->assertStringContainsString('Camat Pontianak Selatan', $documentXml);
         $this->assertStringContainsString('√', $documentXml);
         $this->assertStringNotContainsString('{{employee_name}}', $documentXml);

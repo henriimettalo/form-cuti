@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Rules\AccountPassword;
 use App\Models\Department;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -194,7 +195,7 @@ class UserManagementController extends Controller
             'department_phone' => ['nullable', 'string', 'max:32'],
             'admin_name' => ['required', 'string', 'max:255'],
             'admin_email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
-            'admin_password' => ['required', 'string', 'min:12', 'confirmed'],
+            'admin_password' => [...AccountPassword::rules(), 'confirmed'],
         ]);
 
         $departmentCode = $this->normalizeDepartmentCode(
@@ -371,7 +372,7 @@ class UserManagementController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
-            'password' => ['required', 'string', 'min:12', 'confirmed'],
+            'password' => [...AccountPassword::rules(), 'confirmed'],
         ]);
 
         User::query()->create([

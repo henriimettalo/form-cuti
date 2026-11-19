@@ -1,5 +1,6 @@
 <?php
 
+use App\Logging\ProductionLogProcessor;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -18,7 +19,7 @@ return [
     |
     */
 
-    'default' => env('LOG_CHANNEL', 'stack'),
+    'default' => env('LOG_CHANNEL', env('APP_ENV') === 'production' ? 'production' : 'stack'),
 
     /*
     |--------------------------------------------------------------------------
@@ -103,6 +104,14 @@ return [
             ],
             'formatter' => env('LOG_STDERR_FORMATTER'),
             'processors' => [PsrLogMessageProcessor::class],
+        ],
+
+        'production' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'warning'),
+            'handler' => StreamHandler::class,
+            'handler_with' => ['stream' => 'php://stderr'],
+            'processors' => [ProductionLogProcessor::class],
         ],
 
         'syslog' => [

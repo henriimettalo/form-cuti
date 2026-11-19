@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\EmployeeIdentityImportService;
 use App\Services\PayrollImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Http\UploadedFile;
 use Laravel\Sanctum\PersonalAccessToken;
 use Tests\TestCase;
@@ -25,6 +26,37 @@ class ApiIntegrationTest extends TestCase
     {
         $this->getJson(route('api.v1.employees.index'))
             ->assertUnauthorized();
+    }
+
+    public function test_api_ip_limit_applies_before_authentication(): void
+    {
+        $ip = '192.0.2.20';
+        $this->withServerVariables(['REMOTE_ADDR' => $ip]);
+        RateLimiter::increment('api-v1-ip:'.hash('sha256', $ip), 60, 119);
+
+        $this->getJson(route('api.v1.employees.index'))->assertUnauthorized();
+        $this->getJson(route('api.v1.employees.index'))->assertTooManyRequests()->assertHeader('Retry-After');
+        $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.21'])
+            ->getJson(route('api.v1.employees.index'))->assertUnauthorized();
+    }
+
+    public function test_browser_cors_only_allows_configured_origins(): void
+    {
+        $origin = 'https://dashboard.example.test';
+        $headers = [
+            'Origin' => $origin,
+            'Access-Control-Request-Method' => 'GET',
+            'Access-Control-Request-Headers' => 'authorization',
+        ];
+        $endpoint = route('api.v1.employees.index');
+
+        $this->options($endpoint, [], $headers)->assertHeaderMissing('Access-Control-Allow-Origin');
+        config(['cors.allowed_origins' => [$origin, 'https://reports.example.test']]);
+        $this->options($endpoint, [], $headers)
+            ->assertHeader('Access-Control-Allow-Origin', $origin)
+            ->assertHeaderMissing('Access-Control-Allow-Credentials');
+        $headers['Origin'] = 'https://other.example.test';
+        $this->options($endpoint, [], $headers)->assertHeaderMissing('Access-Control-Allow-Origin');
     }
 
     public function test_token_with_employee_read_ability_can_list_and_show_employees(): void

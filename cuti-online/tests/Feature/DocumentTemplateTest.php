@@ -3,12 +3,15 @@
 namespace Tests\Feature;
 
 use App\Models\DocumentTemplate;
+use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Services\LeaveDocumentTemplateRenderer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
+use RuntimeException;
 use Tests\TestCase;
 
 class DocumentTemplateTest extends TestCase
@@ -86,11 +89,34 @@ class DocumentTemplateTest extends TestCase
         Storage::disk('local')->assertDirectoryEmpty('leave-templates');
     }
 
-    private function wordTemplateUpload(): UploadedFile
+    public function test_external_relationship_is_rejected_for_new_and_stored_templates(): void
+    {
+        Storage::fake('local');
+        $file = $this->wordTemplateUpload(withExternalLink: true);
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('document-templates.store'), ['file' => $file])
+            ->assertSessionHasErrors('file');
+        $this->assertDatabaseCount('document_templates', 0);
+
+        $path = $file->storeAs('leave-templates', 'template-lama.docx', 'local');
+        $template = new DocumentTemplate(['storage_path' => $path]);
+        $output = Storage::disk('local')->path('leave-templates/keluaran.docx');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('tidak memuat referensi eksternal');
+        app(LeaveDocumentTemplateRenderer::class)->render($template, new LeaveRequest, $output);
+    }
+
+    private function wordTemplateUpload(bool $withExternalLink = false): UploadedFile
     {
         $path = tempnam(sys_get_temp_dir(), 'template-cuti-');
         $phpWord = new PhpWord;
-        $phpWord->addSection()->addText('{{employee_name}}');
+        $section = $phpWord->addSection();
+        $section->addText('{{employee_name}}');
+        if ($withExternalLink) {
+            $section->addLink('https://example.invalid/panduan', 'Panduan');
+        }
         IOFactory::createWriter($phpWord, 'Word2007')->save($path);
 
         return new UploadedFile(

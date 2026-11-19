@@ -74,7 +74,7 @@ Buat akun administrator pertama:
 docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml exec app php artisan app:create-admin "Nama Admin" admin@kecamatanpontianakselatan.web.id
 ```
 
-Admin dapat menyiapkan MFA dari tautan **Aktifkan verifikasi dua langkah** di menu akun. Biarkan `REQUIRE_ADMIN_MFA=false` saat migrasi akun yang sudah ada. Setelah setiap Super Admin dan Admin Unit mendaftarkan perangkat dan memastikan dapat masuk menggunakan MFA, setel `REQUIRE_ADMIN_MFA=true` lalu buat ulang container app.
+Masukkan kata sandi minimal 12 karakter melalui prompt terminal. Di produksi, MFA wajib secara bawaan. Admin yang belum mengaktifkannya diarahkan ke pendaftaran perangkat setelah login, melalui halaman **Verifikasi dua langkah**. Untuk instalasi lama yang masih menetapkan `REQUIRE_ADMIN_MFA=false`, ubah ke `true` setelah admin mendaftarkan perangkat dan memastikan bisa login kembali, lalu buat ulang container app.
 
 Untuk pemulihan akun, verifikasi identitas pemilik akun melalui prosedur instansi. Jalankan `php artisan app:issue-password-recovery` melalui terminal container app dan berikan kode 30 menit secara privat. Pengguna memasukkannya melalui tautan **Pulihkan kata sandi** di halaman login. Jangan menyalin kode ke tiket dukungan atau log. Jika perangkat autentikator hilang, gunakan `php artisan app:clear-admin-mfa` setelah verifikasi untuk mencabut sesi serta token dan mengizinkan pendaftaran perangkat baru.
 
@@ -93,6 +93,12 @@ Token integrasi dibuat melalui menu **Integrasi API** setelah login. Base URL AP
 https://cuti.kecamatanpontianakselatan.web.id/api/v1
 ```
 
+API membatasi 120 permintaan per menit per IP sebelum autentikasi. Akun terautentikasi juga dibatasi 60 permintaan per menit. Nginx tepi perlu meneruskan IP klien yang sudah diverifikasi ke aplikasi melalui proxy tepercaya agar beberapa klien tidak dianggap berasal dari IP proxy yang sama.
+
+Akses API lintas origin dinonaktifkan secara bawaan. Isi `API_CORS_ORIGINS` hanya jika browser perlu memanggil API dari origin lain. Gunakan daftar origin lengkap (skema dan host, termasuk port jika diperlukan), dipisah koma. Integrasi server-ke-server tetap memakai Bearer Token.
+
+Gunakan template DOCX dengan gambar tertanam. Referensi eksternal pada bagian relasi DOCX ditolak saat unggah dan saat template dipakai untuk membuat dokumen.
+
 ## Memantau dan memperbarui
 
 Lihat log layanan:
@@ -100,6 +106,8 @@ Lihat log layanan:
 ```bash
 docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml logs -f web app worker
 ```
+
+Log Laravel produksi menyimpan tingkat log dan lokasi pengecualian tanpa pesan mentah, konteks, atau trace. Log akses Nginx container tidak mencatat IP, URL, query, atau header. Docker menyimpan maksimal tiga berkas log dengan batas 10 MB per berkas per layanan. Batasi akses ke Docker di VPS dan terapkan kebijakan yang sama pada log reverse proxy di host, karena konfigurasinya dikelola terpisah.
 
 Setelah pembaruan kode:
 

@@ -5,11 +5,15 @@ namespace App\Services;
 use App\Models\DocumentTemplate;
 use App\Models\LeaveRequest;
 use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpWord\Settings;
 use RuntimeException;
 
 class LeaveDocumentTemplateRenderer
 {
-    public function __construct(private readonly LeaveTemplatePlaceholderResolver $placeholderResolver) {}
+    public function __construct(
+        private readonly LeaveTemplatePlaceholderResolver $placeholderResolver,
+        private readonly LeaveDocxTemplateInspector $inspector,
+    ) {}
 
     public function render(DocumentTemplate $template, LeaveRequest $leaveRequest, string $outputPath): void
     {
@@ -19,13 +23,21 @@ class LeaveDocumentTemplateRenderer
             throw new RuntimeException('Berkas template dokumen tidak ditemukan.');
         }
 
+        $templatePath = $disk->path($template->storage_path);
+        if (! $this->inspector->accepts($templatePath)) {
+            throw new RuntimeException(LeaveDocxTemplateInspector::REJECTION_MESSAGE);
+        }
+
         LeaveDocumentTemplateProcessor::useCurlyBraceMacros();
+        $wasEscaping = Settings::isOutputEscapingEnabled();
+        Settings::setOutputEscapingEnabled(true);
 
         try {
-            $processor = new LeaveDocumentTemplateProcessor($disk->path($template->storage_path));
+            $processor = new LeaveDocumentTemplateProcessor($templatePath);
             $processor->setValues($this->placeholderResolver->values($leaveRequest));
             $processor->saveAs($outputPath);
         } finally {
+            Settings::setOutputEscapingEnabled($wasEscaping);
             LeaveDocumentTemplateProcessor::resetMacroChars();
         }
     }

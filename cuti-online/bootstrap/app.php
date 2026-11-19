@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureRole;
+use App\Http\Middleware\ThrottleApiByIp;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -24,13 +25,16 @@ return Application::configure(basePath: dirname(__DIR__))
             explode(',', (string) env('TRUSTED_PROXIES', '127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16')),
         ))));
 
+        $middleware->append(ThrottleApiByIp::class);
+        $middleware->trimStrings(except: ['admin_password', 'admin_password_confirmation']);
+
         $middleware->alias([
             'abilities' => CheckAbilities::class,
             'role' => EnsureRole::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->dontFlash(['token', 'code']);
+        $exceptions->dontFlash(['token', 'code', 'admin_password', 'admin_password_confirmation']);
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );

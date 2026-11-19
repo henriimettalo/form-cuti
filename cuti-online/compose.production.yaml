@@ -1,9 +1,16 @@
+x-service-logging: &service-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 x-laravel-database: &laravel-database
   DB_CONNECTION: pgsql
   DB_HOST: postgres
   DB_PORT: 5432
   DB_DATABASE: ${POSTGRES_DB:?Atur POSTGRES_DB pada .env.production}
   DB_URL: ""
+  LOG_CHANNEL: production
 
 x-runtime-database: &runtime-database
   <<: *laravel-database
@@ -17,6 +24,7 @@ x-runtime-database: &runtime-database
 services:
   init:
     image: cuti-online-app:latest
+    logging: *service-logging
     env_file:
       - ${APP_ENV_FILE:-.env.production}
     environment:
@@ -54,6 +62,7 @@ services:
       context: .
       target: production
     image: cuti-online-app:latest
+    logging: *service-logging
     env_file:
       - ${APP_ENV_FILE:-.env.production}
     environment: *runtime-database
@@ -75,6 +84,7 @@ services:
 
   worker:
     image: cuti-online-app:latest
+    logging: *service-logging
     env_file:
       - ${APP_ENV_FILE:-.env.production}
     environment: *runtime-database
@@ -88,6 +98,7 @@ services:
 
   scheduler:
     image: cuti-online-app:latest
+    logging: *service-logging
     env_file:
       - ${APP_ENV_FILE:-.env.production}
     environment: *runtime-database
@@ -101,6 +112,7 @@ services:
 
   clamav:
     image: clamav/clamav-debian:stable
+    logging: *service-logging
     restart: unless-stopped
     volumes:
       - clamav_database:/var/lib/clamav
@@ -114,6 +126,7 @@ services:
 
   web:
     image: nginx:1.28-alpine
+    logging: *service-logging
     restart: unless-stopped
     depends_on:
       app:
@@ -124,6 +137,9 @@ services:
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - app_public:/var/www/html/public:ro
       - app_storage:/var/www/html/storage:ro
+
+  postgres:
+    logging: *service-logging
 
 volumes:
   app_public:

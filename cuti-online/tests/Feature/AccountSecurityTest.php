@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use PragmaRX\Google2FA\Google2FA;
 use RuntimeException;
@@ -23,6 +24,7 @@ class AccountSecurityTest extends TestCase
         $user = User::factory()->create();
         $totp = new Google2FA;
         $this->actingAs($user)->get(route('dashboard'))->assertRedirect(route('mfa.setup'));
+        $this->get(route('users.index'))->assertRedirect(route('mfa.setup'));
         $this->get(route('mfa.setup'))->assertOk()->assertHeader('Cache-Control', 'no-store, private');
         $secret = Crypt::decryptString(session('mfa_setup.secret'));
         $firstCode = $totp->getCurrentOtp($secret);
@@ -42,6 +44,36 @@ class AccountSecurityTest extends TestCase
         $this->post(route('mfa.verify'), ['code' => $nextCode])->assertRedirect(route('dashboard'));
         $this->assertAuthenticatedAs($user);
         $this->get(route('dashboard'))->assertOk();
+    }
+
+    public function test_admin_creation_rejects_short_and_oversize_passwords(): void
+    {
+        $arguments = ['name' => 'Admin Uji', 'email' => 'admin-uji@example.test'];
+        $this->artisan('app:create-admin', $arguments + ['--password' => 'pendek'])
+            ->assertFailed();
+        $this->artisan('app:create-admin', $arguments + ['--password' => str_repeat('é', 37)])
+            ->assertFailed();
+        $this->assertDatabaseMissing('users', ['email' => $arguments['email']]);
+
+        $this->artisan('app:create-admin', $arguments)
+            ->expectsQuestion('Kata sandi', 'sandi-panjang-uji')
+            ->assertSuccessful();
+        $this->assertTrue(Hash::check('sandi-panjang-uji', User::query()->sole()->password));
+    }
+
+    public function test_production_log_keeps_exception_type_without_sensitive_data(): void
+    {
+        $stream = fopen('php://memory', 'w+');
+        config(['logging.channels.production.handler_with.stream' => $stream]);
+        Log::channel('production')->error('Pesan rahasia', [
+            'exception' => new RuntimeException('Isi rahasia pengecualian'),
+            'password' => 'Kata sandi rahasia',
+        ]);
+        rewind($stream);
+        $log = stream_get_contents($stream);
+
+        $this->assertStringContainsString('RuntimeException', $log);
+        $this->assertStringNotContainsString('rahasia', $log);
     }
 
     public function test_password_recovery_code_is_consumed_and_old_api_tokens_are_revoked(): void
