@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../src/index.ts"],
+  "sourcesContent": ["/** A named Host entry; the development bridge and UI own the feature. */\nexport const name = 'cslkkl-web-annotator';\nexport function apply(): void {}\n"],
+  "mappings": ";AACO,IAAM,OAAO;AACb,SAAS,QAAc;AAAC;",
+  "names": []
+}

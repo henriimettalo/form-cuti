@@ -1,0 +1,27 @@
+{
+  "packageName": "dsh-web-annotator",
+  "packageVersion": "0.2.2",
+  "targetHarness": "0.2.1-alpha.2",
+  "upstreamCommit": "d743267388641bc76f17c45ce8b4c231aed1d32c",
+  "patchSha256": "2273a14b592af264aca24f54672a241e05fa43efb3b3d4de7982da048afbf6ea",
+  "runtimeHashes": {
+    "browser-provider/lib/client.css": "2da0c7baf268e11fba81f6c172f94f47d1ccb2a4e1f9a4f296d8172a20aa2a55",
+    "browser-provider/lib/client.css.map": "67b1fff806bd92bc7a80447e76a436ee2c1ce23817dc7f5126afb1e7933892af",
+    "browser-provider/lib/client.js": "cf89d42018609f464463b81a6de4f346a56030026388ce46f0c547d7ae884a7b",
+    "browser-provider/lib/client.js.map": "d9f205aafd28ca94aa57e6f566b43a48c828eedc194583e894026f238abfc030",
+    "browser-provider/lib/index.js": "883ba0466c5906f301548b6f60593d47519ec8015f1e9e2c2972a4d00ad876d0",
+    "browser-provider/lib/index.js.map": "8a589af30ee9fcdd97f86b53214d77c68562a1a069738bc93d845dc4dbe03ab9",
+    "chat-provider/lib/client.css": "38db5186ac4795e9c3d44a3e6aa342984f601ef4320499d45f32a0c584e98bde",
+    "chat-provider/lib/client.css.map": "de6c1a65cb9a476d378dd34253bda43665c8ed345c97c9711e119f357feae3fa",
+    "chat-provider/lib/client.js": "80c5b1ba44f44ca70ff5242354174f3e50906cbbae004da520340de062de141e",
+    "chat-provider/lib/client.js.map": "fff1fe0c80548d6d93e56fa4f066d6b8169ad3c4a3f2cd21c936c7178e2d3f5e",
+    "chat-provider/lib/index.js": "e1e458b21554d8f1e1f68dda055e9e3f701e75023ca1daacad17362c1628fdca",
+    "chat-provider/lib/index.js.map": "62227ff2a6cac92a6d60411a19037d674f27dfc3b66c026ebbcecb83a5cd2043",
+    "layout-provider/lib/client.css": "983e610dc484334cb8c6111007e3a90988c499b2aa5a41d6476ef44980426776",
+    "layout-provider/lib/client.css.map": "47ed7b60bea0c7af736abe32fe19b505ee561d123affb9f2fbe419dec4ddc0d2",
+    "layout-provider/lib/client.js": "1789ecad41406dc1ccd55c4125e8185b78223a65366f90626132c222b57ce63f",
+    "layout-provider/lib/client.js.map": "2bc61c00ab6835f65780493c861fff1369e49dd4c6858c3d68addbe88d4e8ea8",
+    "layout-provider/lib/index.js": "8280400eb0261e41a38616c211657dc10ae8670fae75b201bba8d58f43759488",
+    "layout-provider/lib/index.js.map": "9fdcc2bf5369c510df63d19d5cf62e5863792b17ba31e5f377019df2011411c2"
+  }
+}

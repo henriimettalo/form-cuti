@@ -1,0 +1,25 @@
+{
+  "name": "@deepseek-ai/dsh-client-ui-layout",
+  "version": "0.2.1-alpha.2",
+  "description": "DSH Web Annotator's patched layout provider; derived from DeepSeek Harness",
+  "type": "module",
+  "license": "MIT",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-session",
+        "@deepseek-ai/dsh-client-ui-theme",
+        "@deepseek-ai/dsh-client-shortcuts"
+      ],
+      "platform": "web"
+    }
+  }
+}

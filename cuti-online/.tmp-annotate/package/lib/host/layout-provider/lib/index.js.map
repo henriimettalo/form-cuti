@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../../.host-source/packages/client/ui-layout/src/index.ts"],
+  "sourcesContent": ["/** Host loader entry for the browser-only layout plugin. */\n\n/** Provides no host-side behavior. */\nexport function apply(): void {}\n"],
+  "mappings": ";AAGO,SAAS,QAAc;AAAC;",
+  "names": []
+}

@@ -1,0 +1,84 @@
+/**
+ * Atomic live configuration owner for the plugin's internal runtime. A new
+ * upstream adapter is fully prepared before it replaces the currently serving
+ * runtime, so failed Settings edits never interrupt in-flight or later calls.
+ * @module dsh-vision-toolkit/runtime-manager
+ */
+import type { Context } from '@deepseek-ai/cordis';
+import { type ResolvedVisionToolkitConfig, type VisionToolkitConfig } from './config.ts';
+import { VisionToolkitRuntime } from './runtime.ts';
+import { type UpstreamVersionInfo } from './upstream.ts';
+/** One completely prepared configuration generation. */
+export interface PreparedRuntimeGeneration {
+    config: ResolvedVisionToolkitConfig;
+    fingerprint: string;
+    runtime: VisionToolkitRuntime;
+}
+/** Public, secret-free status used by the Settings page. */
+export interface RuntimeManagerStatus {
+    ready: boolean;
+    generation: number;
+    activeConfig?: ResolvedVisionToolkitConfig;
+    upstream?: UpstreamVersionInfo;
+    lastError?: string;
+}
+/** Storage selection paired to the active or validated startup generation. */
+export interface RuntimeStorageGeneration {
+    generation: number;
+    storageDir?: string;
+}
+/** Test seam for preparing one generation. */
+export type RuntimeGenerationFactory = (ctx: Context, config: ResolvedVisionToolkitConfig, readableStorageDirs: readonly string[]) => Promise<VisionToolkitRuntime>;
+/** Async commit prerequisite run after preparation and before a generation becomes active. */
+export type RuntimeGenerationBeforePublish = (candidate: PreparedRuntimeGeneration) => Promise<void>;
+/** Internal runtime source with prepare-before-swap semantics. */
+export declare class VisionToolkitRuntimeManager {
+    private readonly ctx;
+    private readonly factory;
+    private active;
+    private generation;
+    private reconfigureTicket;
+    private lastError;
+    private validatedStartupStorageDir;
+    private readonly readableStorageDirs;
+    constructor(ctx: Context, factory?: RuntimeGenerationFactory);
+    /** The currently serving runtime; unavailable until one generation prepares. */
+    current(): VisionToolkitRuntime;
+    /** Configuration belonging to the currently serving runtime generation. */
+    currentConfig(): ResolvedVisionToolkitConfig;
+    /** Whether at least one generation is available. */
+    get ready(): boolean;
+    /** Storage config safe for paste writes even when initial runtime preparation failed. */
+    storageGeneration(): RuntimeStorageGeneration;
+    /** Validated storage for best-effort consumers; undefined when startup preflight failed. */
+    validatedStorageDirectory(): string | undefined;
+    private prepareResolvedCandidate;
+    private rememberStorageDirectory;
+    private rememberStorageDirectories;
+    /** Resolve and fully prepare a candidate without changing the active runtime. */
+    prepareCandidate(raw: VisionToolkitConfig): Promise<PreparedRuntimeGeneration>;
+    /**
+     * Publish one already-prepared generation atomically.
+     * @param candidate - generation returned by {@link prepareCandidate}.
+     */
+    activateCandidate(candidate: PreparedRuntimeGeneration): void;
+    /**
+     * Prepare and publish the initial or explicitly validated generation.
+     * @param raw - untrusted Settings generation to resolve and prepare.
+     * @param beforePublish - optional durable prerequisite run after preparation.
+     */
+    initialize(raw: VisionToolkitConfig, beforePublish?: RuntimeGenerationBeforePublish): Promise<void>;
+    /**
+     * Apply an externally committed Settings generation. Concurrent edits are
+     * last-write-wins; a slower obsolete prepare can never overwrite a newer one.
+     * @param raw - externally committed Settings generation.
+     * @param beforePublish - optional durable prerequisite run after preparation.
+     * @returns whether this call published a new active generation.
+     */
+    reconfigure(raw: VisionToolkitConfig, beforePublish?: RuntimeGenerationBeforePublish): Promise<boolean>;
+    /** Record a failed preflight while retaining the previous generation. */
+    recordFailure(error: unknown): void;
+    /** Secret-free status snapshot for health/configuration surfaces. */
+    status(): RuntimeManagerStatus;
+}
+//# sourceMappingURL=runtime-manager.d.ts.map

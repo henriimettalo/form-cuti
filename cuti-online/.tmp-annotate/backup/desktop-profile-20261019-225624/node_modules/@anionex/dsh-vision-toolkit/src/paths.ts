@@ -1,0 +1,622 @@
+/**
+ * Path fence shared by every tool: inputs must live in the workspace, the
+ * platform temporary directory, or an explicitly authorized directory;
+ * outputs stay inside the plugin-managed output directory, and a symbolic
+ * link is allowed only when its real target stays inside the fence.
+ * @module dsh-vision-toolkit/paths
+ */
+
+import { createHash, randomUUID } from 'node:crypto'
+import type { Stats } from 'node:fs'
+import { cp, link, lstat, mkdir, mkdtemp, readdir, realpath, rename, rm, stat } from 'node:fs/promises'
+import { dirname, extname, isAbsolute, join, relative, resolve, sep, win32 } from 'node:path'
+import { homedir, tmpdir } from 'node:os'
+import { VisionToolkitError } from './errors.ts'
+
+/** Supported input image extensions (the upstream client's allowlist). */
+export const SUPPORTED_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp'] as const
+
+/** Resolved path policy for one tool invocation. */
+export interface PathPolicy {
+  /** Real workspace root. */
+  workspace: string
+  /** Real platform temporary directory, authorized for transient inputs. */
+  tempDir: string
+  /** Real allowed roots: workspace, platform temp, and configured directories. */
+  allowedDirs: string[]
+  /** Real plugin-managed root containing artifacts and transient files. */
+  storageRoot: string
+  /** Real plugin-managed output directory inside the fence. */
+  outputDir: string
+}
+
+/** Resolved plugin storage for one workspace. */
+export interface WorkspaceStorage {
+  /** Real workspace root. */
+  workspace: string
+  /** Real plugin-managed root for this workspace. */
+  root: string
+  /** Absolute user-visible spelling of the same managed root. */
+  visibleRoot: string
+}
+
+/** Whether `child` equals or lies under `parent` on the same path root. */
+export function isWithin(parent: string, child: string): boolean {
+  const rel = relative(parent, child)
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel))
+}
+
+function expandUserHome(raw: string): string {
+  if (raw === '~') return homedir()
+  if (raw.startsWith('~/') || raw.startsWith(`~${sep}`)) return join(homedir(), raw.slice(2))
+  return raw
+}
+
+/** Current platform temporary directory before realpath canonicalization. */
+export function platformTempDirectory(
+  platform: NodeJS.Platform = process.platform,
+  environment: NodeJS.ProcessEnv = process.env,
+): string {
+  if (platform !== 'win32') return '/tmp'
+  const configured = environment.TEMP?.trim() || environment.TMP?.trim()
+  return configured === undefined || configured.length === 0 ? tmpdir() : configured
+}
+
+/**
+ * Translate the POSIX-shaped `/tmp/...` paths commonly emitted by models to
+ * the actual Windows temporary directory. Other paths and platforms are left
+ * unchanged, and the normal realpath fence still validates the result.
+ */
+export function normalizePlatformTempPath(
+  raw: string,
+  platform: NodeJS.Platform = process.platform,
+  tempDirectory: string = platformTempDirectory(platform),
+): string {
+  if (platform !== 'win32') return raw
+  if (raw === '/tmp') return tempDirectory
+  if (!raw.startsWith('/tmp/')) return raw
+  return win32.join(tempDirectory, raw.slice('/tmp/'.length))
+}
+
+/** Stable opaque per-user workspace id used below a shared storage root. */
+export function workspaceStorageId(
+  workspace: string,
+  userIdentity: string = typeof process.geteuid === 'function'
+    ? `uid:${process.geteuid()}`
+    : `home:${homedir()}`,
+): string {
+  return createHash('sha256')
+    .update(userIdentity)
+    .update('\0')
+    .update(workspace)
+    .digest('hex')
+    .slice(0, 20)
+}
+
+function currentPosixUid(): number {
+  if (typeof process.geteuid !== 'function') {
+    throw new VisionToolkitError(
+      'path',
+      'configured storage directory is not supported on this platform because ownership and permissions cannot be verified',
+    )
+  }
+  return process.geteuid()
+}
+
+export function assertSecureWorkspaceStorage(info: Stats, requested: string): void {
+  const currentUid = currentPosixUid()
+  if (info.uid !== currentUid || (info.mode & 0o777) !== 0o700) {
+    throw new VisionToolkitError('path', `workspace storage directory must be owned by the current user with mode 0700: ${requested}`)
+  }
+}
+
+/** Resolve a shared base and prove every POSIX ancestor is protected from replacement. */
+export async function assertSecureSharedStorageBase(requested: string): Promise<string> {
+  const currentUid = currentPosixUid()
+  const requestedPath = resolve(requested)
+  const requestedChain: string[] = []
+  let requestedCurrent = requestedPath
+  while (true) {
+    requestedChain.push(requestedCurrent)
+    const parent = dirname(requestedCurrent)
+    if (parent === requestedCurrent) break
+    requestedCurrent = parent
+  }
+  for (const component of requestedChain.reverse()) {
+    const info = await lstat(component)
+    if (info.isSymbolicLink()) {
+      if (info.uid !== 0) {
+        throw new VisionToolkitError('path', `configured storage directory contains an untrusted symbolic link: ${component}`)
+      }
+      continue
+    }
+    if (!info.isDirectory()) {
+      throw new VisionToolkitError('path', `configured storage path component is not a directory: ${component}`)
+    }
+    const writableByOthers = (info.mode & 0o022) !== 0
+    const sticky = (info.mode & 0o1000) !== 0
+    if (
+      (info.uid !== currentUid && info.uid !== 0)
+      || (writableByOthers && !sticky)
+    ) throw new VisionToolkitError('path', `configured storage directory has an untrusted path component: ${component}`)
+  }
+  const canonical = await realpath(requestedPath)
+  let current = canonical
+  while (true) {
+    const info = await lstat(current)
+    const writableByOthers = (info.mode & 0o022) !== 0
+    const sticky = (info.mode & 0o1000) !== 0
+    if (
+      info.isSymbolicLink()
+      || !info.isDirectory()
+      || (info.uid !== currentUid && info.uid !== 0)
+      || (writableByOthers && !sticky)
+    ) throw new VisionToolkitError('path', `configured storage directory has an untrusted path component: ${current}`)
+    const parent = dirname(current)
+    if (parent === current) return canonical
+    current = parent
+  }
+}
+
+function requestedSharedStorageBase(storageDirRaw: string): string {
+  currentPosixUid()
+  const configured = normalizePlatformTempPath(expandUserHome(storageDirRaw.trim()))
+  if (!isAbsolute(configured)) {
+    throw new VisionToolkitError('path', `configured storage directory must be an absolute path: ${storageDirRaw}`)
+  }
+  return resolve(configured)
+}
+
+async function ensureSharedStorageBase(storageDirRaw: string): Promise<{ requestedBase: string; base: string }> {
+  const requestedBase = requestedSharedStorageBase(storageDirRaw)
+  try {
+    await mkdir(requestedBase, { recursive: true, mode: 0o700 })
+  } catch (error) {
+    throw new VisionToolkitError('path', `configured storage directory is not writable: ${requestedBase}`, { cause: error })
+  }
+  try {
+    return { requestedBase, base: await assertSecureSharedStorageBase(requestedBase) }
+  } catch (error) {
+    throw new VisionToolkitError('path', `configured storage directory is not accessible: ${requestedBase}`, { cause: error })
+  }
+}
+
+/** Validate and write-probe a configured shared root before Settings activation. */
+export async function preflightSharedStorageBase(storageDirRaw: string): Promise<string> {
+  const { base } = await ensureSharedStorageBase(storageDirRaw)
+  let probe: string | undefined
+  let failure: unknown
+  try {
+    probe = await mkdtemp(join(base, '.dsh-vision-toolkit-preflight-'))
+    assertSecureWorkspaceStorage(await lstat(probe), probe)
+  } catch (error) {
+    failure = error
+  }
+  if (probe !== undefined) {
+    try {
+      await rm(probe, { recursive: true, force: true })
+    } catch (error) {
+      failure ??= error
+    }
+  }
+  if (failure !== undefined) {
+    throw new VisionToolkitError('path', `configured storage directory failed its write preflight: ${base}`, { cause: failure })
+  }
+  return base
+}
+
+async function managedDirectory(
+  parent: string,
+  requested: string,
+  label: string,
+  secureWorkspaceStorage = false,
+): Promise<string> {
+  try {
+    await mkdir(requested, { mode: 0o700 })
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) {
+      throw new VisionToolkitError('path', `${label} is not writable: ${requested}`, { cause: error })
+    }
+  }
+  let info
+  try {
+    info = await lstat(requested)
+  } catch (error) {
+    throw new VisionToolkitError('path', `${label} is not accessible: ${requested}`, { cause: error })
+  }
+  if (info.isSymbolicLink() || !info.isDirectory()) {
+    throw new VisionToolkitError('path', `${label} must be a real directory: ${requested}`)
+  }
+  if (secureWorkspaceStorage) assertSecureWorkspaceStorage(info, requested)
+  const canonical = await realpath(requested)
+  if (!isWithin(parent, canonical)) {
+    throw new VisionToolkitError('path', `${label} escaped its configured root: ${requested}`)
+  }
+  return canonical
+}
+
+/**
+ * Resolve the plugin-managed root for one workspace. Blank configuration keeps
+ * the legacy workspace-local `.dsh-vision-toolkit` directory. A configured
+ * shared root receives one stable, automatically generated workspace child.
+ * Workspace-local permission failures remain fail-closed and identify the
+ * writable-session-workspace workaround; no alternate root is selected.
+ */
+export async function resolveWorkspaceStorage(
+  workspaceRaw: string,
+  storageDirRaw?: string,
+): Promise<WorkspaceStorage> {
+  const expandedWorkspace = expandUserHome(workspaceRaw)
+  const visibleWorkspace = resolve(expandedWorkspace)
+  let workspace: string
+  try {
+    workspace = await realpath(visibleWorkspace)
+  } catch (error) {
+    throw new VisionToolkitError('path', `workspace is not accessible: ${workspaceRaw}`, { cause: error })
+  }
+
+  if (storageDirRaw === undefined || storageDirRaw.trim().length === 0) {
+    const visibleRoot = join(visibleWorkspace, '.dsh-vision-toolkit')
+    try {
+      const root = await managedDirectory(workspace, visibleRoot, 'plugin storage directory')
+      return { workspace, root, visibleRoot }
+    } catch (error) {
+      if (
+        error instanceof VisionToolkitError
+        && error.cause instanceof Error
+        && 'code' in error.cause
+        && ['EACCES', 'EPERM', 'EROFS'].includes(String(error.cause.code))
+      ) {
+        throw new VisionToolkitError(
+          'path',
+          `${error.message}. Choose a session workspace writable by the current user and retry. On Windows, leave storageDir blank; configured shared storage requires ACL validation that is not yet available.`,
+          { cause: error.cause },
+        )
+      }
+      throw error
+    }
+  }
+
+  const { requestedBase, base } = await ensureSharedStorageBase(storageDirRaw)
+  const id = workspaceStorageId(workspace)
+  const visibleRoot = join(requestedBase, id)
+  const root = await managedDirectory(base, join(base, id), 'workspace storage directory', true)
+  return { workspace, root, visibleRoot }
+}
+
+async function resolveReadableWorkspaceStorageRoot(
+  workspace: string,
+  storageDirRaw: string,
+): Promise<string> {
+  const requestedBase = requestedSharedStorageBase(storageDirRaw)
+  const base = await assertSecureSharedStorageBase(requestedBase)
+  const requestedRoot = join(base, workspaceStorageId(workspace))
+  const info = await lstat(requestedRoot)
+  if (info.isSymbolicLink() || !info.isDirectory()) {
+    throw new VisionToolkitError('path', `historical workspace storage must be a real directory: ${requestedRoot}`)
+  }
+  assertSecureWorkspaceStorage(info, requestedRoot)
+  const root = await realpath(requestedRoot)
+  if (!isWithin(base, root)) {
+    throw new VisionToolkitError('path', `historical workspace storage escaped its configured root: ${requestedRoot}`)
+  }
+  return root
+}
+
+/**
+ * Build the per-invocation path policy: resolve workspace storage, realpath the
+ * platform temp directory and allowed directories, and create the artifact
+ * directory inside the managed root.
+ * @param workspaceRaw - session workspace (or process cwd fallback).
+ * @param allowedDirs - configured extra allowed roots.
+ * @param storageDirRaw - optional shared storage root.
+ * @param readableStorageDirs - previously validated shared roots retained for persisted input paths.
+ * @returns the resolved policy.
+ */
+export async function createPathPolicy(
+  workspaceRaw: string,
+  allowedDirs: readonly string[],
+  storageDirRaw?: string,
+  readableStorageDirs: readonly string[] = [],
+): Promise<PathPolicy> {
+  const storage = await resolveWorkspaceStorage(workspaceRaw, storageDirRaw)
+  const { workspace } = storage
+  let tempDir: string
+  const tempDirectoryRaw = platformTempDirectory()
+  try {
+    tempDir = await realpath(tempDirectoryRaw)
+  } catch (error) {
+    throw new VisionToolkitError('path', `platform temporary directory is not accessible: ${tempDirectoryRaw}`, { cause: error })
+  }
+  const roots = [workspace, tempDir, storage.root]
+  for (const raw of readableStorageDirs) {
+    if (raw === storageDirRaw) continue
+    try {
+      roots.push(await resolveReadableWorkspaceStorageRoot(workspace, raw))
+    } catch {
+      // Historical roots are read-only compatibility fences. Missing or newly
+      // unsafe roots stay unauthorized without breaking the active runtime.
+    }
+  }
+  for (const raw of allowedDirs) {
+    const candidate = expandUserHome(raw)
+    const target = isAbsolute(candidate) ? candidate : resolve(workspace, candidate)
+    try {
+      roots.push(await realpath(target))
+    } catch (error) {
+      throw new VisionToolkitError('path', `allowedDirs entry is not accessible: ${raw}`, { cause: error })
+    }
+  }
+  const outputDir = await managedDirectory(storage.root, join(storage.root, 'artifacts'), 'artifact directory')
+  return {
+    workspace,
+    tempDir,
+    allowedDirs: [...new Set(roots)],
+    storageRoot: storage.root,
+    outputDir,
+  }
+}
+
+/**
+ * Validate one input image path and return its fence-checked absolute path
+ * and byte size.
+ * @param raw - image path, resolved against the workspace.
+ * @param policy - active path fence.
+ * @returns absolute path and file size.
+ */
+export async function resolveInputFile(raw: string, policy: PathPolicy): Promise<{ path: string; bytes: number }> {
+  return resolveAuthorizedFile(raw, policy, SUPPORTED_IMAGE_EXTENSIONS, 'image')
+}
+
+/**
+ * Validate one authorized regular file against an explicit extension set.
+ * Realpath fencing makes local HTML and future non-image inputs follow the
+ * same symlink-safe policy as images.
+ * @param raw - path resolved against the workspace.
+ * @param policy - active path fence.
+ * @param extensions - accepted lowercase extensions including the leading dot.
+ * @param kind - user-facing noun used in stable errors.
+ * @returns absolute real path and file size.
+ */
+export async function resolveAuthorizedFile(
+  raw: string,
+  policy: PathPolicy,
+  extensions: readonly string[],
+  kind: string,
+): Promise<{ path: string; bytes: number }> {
+  const candidate = expandUserHome(normalizePlatformTempPath(raw, process.platform, policy.tempDir))
+  const target = isAbsolute(candidate) ? candidate : resolve(policy.workspace, candidate)
+  let real: string
+  try {
+    real = await realpath(target)
+  } catch (error) {
+    throw new VisionToolkitError('input', `${kind} not found: ${raw}`, { cause: error })
+  }
+  if (!policy.allowedDirs.some(root => isWithin(root, real))) {
+    throw new VisionToolkitError('path', `${kind} escapes the allowed directories: ${raw}`)
+  }
+  let info
+  try {
+    info = await stat(real)
+  } catch (error) {
+    throw new VisionToolkitError('input', `${kind} is not readable: ${raw}`, { cause: error })
+  }
+  if (!info.isFile()) throw new VisionToolkitError('input', `${kind} is not a regular file: ${raw}`)
+  const extension = real.slice(real.lastIndexOf('.')).toLowerCase()
+  if (!extensions.includes(extension)) {
+    throw new VisionToolkitError(
+      'input',
+      `unsupported ${kind} format "${extension || '(none)'}"; supported: ${extensions.join(', ')}`,
+    )
+  }
+  return { path: real, bytes: info.size }
+}
+
+/** Validate a local HTML document; URL and data-URI inputs never reach Chrome. */
+export function resolveHtmlFile(raw: string, policy: PathPolicy): Promise<{ path: string; bytes: number }> {
+  return resolveAuthorizedFile(raw, policy, ['.html', '.htm'], 'HTML source')
+}
+
+/**
+ * Resolve an optional user-supplied output filename inside the plugin output
+ * directory. Absolute paths, `..` segments, and wrong extensions are rejected.
+ * @param raw - output filename (workspace/outputDir-relative).
+ * @param policy - active path fence.
+ * @param defaultName - generated default filename.
+ * @param extensions - allowed extensions for this output kind.
+ * @returns absolute output path (not yet created).
+ */
+export function resolveOutputFile(
+  raw: string | undefined,
+  policy: PathPolicy,
+  defaultName: string,
+  extensions: readonly string[],
+): string {
+  const name = raw === undefined || raw.trim().length === 0 ? defaultName : raw.trim()
+  const expanded = expandUserHome(name)
+  if (isAbsolute(expanded)) throw new VisionToolkitError('path', 'output must be a filename, not an absolute path')
+  const segments = expanded.split(/[\\/]/)
+  if (segments.length !== 1 || segments[0] === '' || segments[0] === '.' || segments[0] === '..') {
+    throw new VisionToolkitError('path', 'output must be one filename inside the output directory')
+  }
+  const extension = expanded.slice(expanded.lastIndexOf('.')).toLowerCase()
+  if (!extensions.includes(extension)) {
+    throw new VisionToolkitError('output', `output must use one of: ${extensions.join(', ')}`)
+  }
+  const target = resolve(policy.outputDir, expanded)
+  if (!isWithin(policy.outputDir, target)) {
+    throw new VisionToolkitError('path', 'output must stay inside the output directory')
+  }
+  return target
+}
+
+/**
+ * Reserve a random, non-user-controlled staging path inside the real output
+ * directory. Upstream writes here so an existing destination symlink can
+ * never redirect the write outside the fence.
+ * @param policy - active path fence.
+ * @param extension - output extension including the leading dot.
+ * @returns absent staging path inside {@link PathPolicy.outputDir}.
+ */
+export function createStagedOutput(policy: PathPolicy, extension: string): string {
+  if (extension !== extname(`file${extension}`) || !/^\.[a-z0-9]+$/i.test(extension)) {
+    throw new VisionToolkitError('output', `invalid staging extension: ${extension}`)
+  }
+  return join(policy.outputDir, `.vision-toolkit-${randomUUID()}${extension}`)
+}
+
+/** Resolve one direct child directory of the managed artifact root. */
+export function resolveOutputDirectory(raw: string | undefined, policy: PathPolicy, defaultName: string): string {
+  const name = raw === undefined || raw.trim().length === 0 ? defaultName : raw.trim()
+  const expanded = expandUserHome(name)
+  if (isAbsolute(expanded)) throw new VisionToolkitError('path', 'artifact directory must not be an absolute path')
+  const segments = expanded.split(/[\\/]/)
+  if (
+    segments.length !== 1
+    || segments[0] === ''
+    || segments[0] === '.'
+    || segments[0] === '..'
+    || expanded.startsWith('.vision-toolkit-')
+  ) {
+    throw new VisionToolkitError('path', 'artifact directory must be one visible directory name inside the output directory')
+  }
+  const target = resolve(policy.outputDir, expanded)
+  if (!isWithin(policy.outputDir, target)) {
+    throw new VisionToolkitError('path', 'artifact directory must stay inside the output directory')
+  }
+  return target
+}
+
+/** Create a random staging directory that no upstream command can choose. */
+export async function createStagedDirectory(policy: PathPolicy): Promise<string> {
+  const path = join(policy.outputDir, `.vision-toolkit-${randomUUID()}`)
+  await mkdir(path)
+  return path
+}
+
+async function assertSafeDirectoryTree(root: string, current = root): Promise<void> {
+  for (const entry of await readdir(current, { withFileTypes: true })) {
+    const path = join(current, entry.name)
+    const info = await lstat(path)
+    if (info.isSymbolicLink()) {
+      throw new VisionToolkitError('path', `managed artifact directory contains a symbolic link: ${entry.name}`)
+    }
+    if (info.isDirectory()) {
+      await assertSafeDirectoryTree(root, path)
+      continue
+    }
+    if (!info.isFile()) {
+      throw new VisionToolkitError('path', `managed artifact directory contains a non-regular entry: ${entry.name}`)
+    }
+    const real = await realpath(path)
+    if (!isWithin(root, real)) {
+      throw new VisionToolkitError('path', `managed artifact entry escaped its directory: ${entry.name}`)
+    }
+  }
+}
+
+/**
+ * Copy an existing managed run into staging for an explicit resume operation.
+ * A missing destination is a normal first run; non-directory or symlink state
+ * fails closed instead of giving the upstream script an ambiguous workspace.
+ */
+export async function seedStagedDirectory(finalPath: string, staged: string, policy: PathPolicy): Promise<boolean> {
+  let info
+  try {
+    info = await lstat(finalPath)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+    throw new VisionToolkitError('path', 'existing artifact directory is not accessible', { cause: error })
+  }
+  if (info.isSymbolicLink() || !info.isDirectory()) {
+    throw new VisionToolkitError('path', 'resume target must be a real managed artifact directory')
+  }
+  const real = await realpath(finalPath)
+  if (!isWithin(policy.outputDir, real)) {
+    throw new VisionToolkitError('path', 'resume target escaped the managed output directory')
+  }
+  await assertSafeDirectoryTree(real)
+  await cp(real, staged, { recursive: true, force: true })
+  await assertSafeDirectoryTree(staged)
+  return true
+}
+
+/**
+ * Atomically replace one managed artifact directory, restoring the previous
+ * complete run if the final rename fails. The upstream only ever writes the
+ * random staging path.
+ */
+export async function commitStagedDirectory(staged: string, finalPath: string, policy: PathPolicy): Promise<void> {
+  const stagedReal = await realpath(staged).catch((error: unknown) => {
+    throw new VisionToolkitError('output', 'upstream did not create the expected artifact directory', { cause: error })
+  })
+  if (!isWithin(policy.outputDir, stagedReal)) {
+    throw new VisionToolkitError('path', 'staged artifact directory escaped the managed output directory')
+  }
+  const stagedInfo = await lstat(stagedReal)
+  if (stagedInfo.isSymbolicLink() || !stagedInfo.isDirectory()) {
+    throw new VisionToolkitError('output', 'staged artifact output is not a real directory')
+  }
+  await assertSafeDirectoryTree(stagedReal)
+  const backup = join(policy.outputDir, `.vision-toolkit-backup-${randomUUID()}`)
+  let movedPrevious = false
+  try {
+    try {
+      await rename(finalPath, backup)
+      movedPrevious = true
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
+    try {
+      await rename(stagedReal, finalPath)
+    } catch (error) {
+      if (movedPrevious) await rename(backup, finalPath).catch(() => {})
+      throw error
+    }
+    if (movedPrevious) await rm(backup, { recursive: true, force: true })
+  } catch (error) {
+    throw new VisionToolkitError('output', 'could not commit the managed artifact directory', { cause: error })
+  }
+}
+
+/**
+ * Validate a staged regular file and atomically place it at the resolved final
+ * filename. Replacing an existing symlink replaces the link itself; upstream
+ * never opens the user-selected destination.
+ * @param staged - random staging path returned by {@link createStagedOutput}.
+ * @param finalPath - final path returned by {@link resolveOutputFile}.
+ * @param policy - active path fence.
+ */
+export async function commitStagedOutput(staged: string, finalPath: string, policy: PathPolicy): Promise<void> {
+  const real = await realpath(staged).catch((error: unknown) => {
+    throw new VisionToolkitError('output', 'upstream did not create the expected output file', { cause: error })
+  })
+  if (!isWithin(policy.outputDir, real)) {
+    throw new VisionToolkitError('path', 'staged output escaped the managed output directory')
+  }
+  const info = await stat(real)
+  if (!info.isFile()) throw new VisionToolkitError('output', 'upstream output is not a regular file')
+  try {
+    await rename(real, finalPath)
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code !== 'EEXIST' && code !== 'EPERM') throw error
+    await rm(finalPath, { force: true })
+    try {
+      await link(real, finalPath)
+    } catch (linkError) {
+      if ((linkError as NodeJS.ErrnoException).code === 'EEXIST') {
+        throw new VisionToolkitError('path', 'output destination changed while the staged file was being committed', { cause: linkError })
+      }
+      throw linkError
+    }
+    await rm(real, { force: true })
+  }
+}
+
+/** Reject an output that would overwrite its own input file. */
+export function assertDistinctOutput(input: string, output: string): void {
+  if (input === output) {
+    throw new VisionToolkitError('input', 'output would overwrite the input image')
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../../.host-source/packages/client/ui-sidebar-browser/src/index.ts"],
+  "sourcesContent": ["/** Host companion for the Sidebar Browser Client plugin. */\n\n/** Mount the browser-only plugin through the Client loader. */\nexport function apply(): void {}\n"],
+  "mappings": ";AAGO,SAAS,QAAc;AAAC;",
+  "names": []
+}
