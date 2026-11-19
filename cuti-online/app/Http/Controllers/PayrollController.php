@@ -8,6 +8,7 @@ use App\Models\PayrollImport;
 use App\Models\PayrollPeriod;
 use App\Services\PayrollExportService;
 use App\Services\PayrollImportService;
+use App\Rules\SafeUpload;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -74,7 +75,7 @@ class PayrollController extends Controller
             'year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'month' => ['required', 'integer', 'min:1', 'max:12'],
             'source_type' => ['nullable', 'in:primary,tpp'],
-            'file' => ['required', 'file', 'max:10240', 'mimes:csv,txt,xlsx'],
+            'file' => ['bail', 'required', 'file', 'mimes:csv,txt,xlsx', 'extensions:csv,txt,xlsx', 'max:10240', new SafeUpload],
         ], [
             'file.required' => 'Pilih file payroll yang akan diimpor.',
             'file.mimes' => 'Gunakan file CSV atau Excel (.xlsx).',

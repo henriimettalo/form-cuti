@@ -3,7 +3,10 @@
 use App\Models\User;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Symfony\Component\Console\Command\Command;
 
 Artisan::command('inspire', function () {
@@ -34,3 +37,34 @@ Artisan::command('app:create-admin {name? : Nama lengkap administrator} {email? 
 
     return Command::SUCCESS;
 })->purpose('Membuat atau memperbarui akun administrator SIMPEG');
+
+Artisan::command('app:issue-password-recovery {email?}', function (?string $email = null) {
+    $email ??= $this->ask('Email akun yang identitasnya sudah dikonfirmasi');
+    $user = User::query()->where('email', trim((string) $email))->first();
+    if ($user === null || ! $this->confirm('Terbitkan kode sekali pakai setelah identitas pengguna diverifikasi?')) {
+        return Command::FAILURE;
+    }
+
+    $this->line(Password::createToken($user));
+    $this->info('Kode berlaku 30 menit. Berikan secara privat kepada pemilik akun.');
+
+    return Command::SUCCESS;
+})->purpose('Menerbitkan kode pemulihan kata sandi sekali pakai');
+
+Artisan::command('app:clear-admin-mfa {email?}', function (?string $email = null) {
+    $email ??= $this->ask('Email admin yang identitasnya sudah dikonfirmasi');
+    $user = User::query()->where('email', trim((string) $email))->first();
+    if (! $user?->canManageAccounts() || ! $this->confirm('Cabut MFA dan semua sesi akun ini setelah identitasnya diverifikasi?')) {
+        return Command::FAILURE;
+    }
+
+    DB::transaction(function () use ($user): void {
+        $user->forceFill(['mfa_secret' => null, 'mfa_last_step' => null, 'remember_token' => Str::random(60)])->save();
+        $user->revokeDatabaseSessions();
+        $user->tokens()->delete();
+    });
+
+    $this->info('MFA dilepas. Admin harus mendaftarkan ulang perangkat verifikasi.');
+
+    return Command::SUCCESS;
+})->purpose('Pemulihan MFA Admin dari terminal server');

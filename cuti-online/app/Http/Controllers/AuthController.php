@@ -22,24 +22,45 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
-            return back()
-                ->withInput($request->only('email', 'remember'))
-                ->withErrors(['email' => 'Email atau kata sandi tidak sesuai.']);
+        $request->session()->forget('pending_mfa');
+        $pending = null;
+        $inactive = false;
+        $accepted = Auth::attemptWhen($credentials, function (User $user) use (&$pending, &$inactive): bool {
+            if (! $user->isSuperAdmin() && ! $user->department?->is_active) {
+                $inactive = true;
+
+                return false;
+            }
+
+            if ($user->mfa_secret !== null) {
+                $pending = $user;
+
+                return false;
+            }
+
+            return true;
+        }, $request->boolean('remember'));
+
+        if ($pending instanceof User) {
+            $request->session()->regenerate();
+            $request->session()->put('pending_mfa', [
+                'user_id' => $pending->id,
+                'password_fingerprint' => hash('sha256', $pending->getAuthPassword()),
+                'expires_at' => now()->addMinutes(5)->timestamp,
+            ]);
+
+            return to_route('mfa.challenge');
         }
 
-        /** @var User|null $user */
-        $user = Auth::user();
-        if ($user instanceof User && ! $user->isSuperAdmin() && ! $user->department?->is_active) {
-            Auth::logout();
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
-
+        if (! $accepted) {
             return to_route('login')
                 ->withInput($request->only('email', 'remember'))
-                ->withErrors(['email' => 'Akun diblokir karena unit kerja Anda sedang nonaktif.']);
+                ->withErrors(['email' => $inactive
+                    ? 'Akun diblokir karena unit kerja Anda sedang nonaktif.'
+                    : 'Email atau kata sandi tidak sesuai.']);
         }
 
+        $request->session()->forget(['pending_mfa', 'mfa_user']);
         $request->session()->regenerate();
 
         return redirect()->intended(route('dashboard'));

@@ -22,6 +22,10 @@
                 <form class="rounded-3xl bg-white p-6 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-7" method="POST" action="{{ route('login.store') }}">
                     @csrf
 
+                    @if (session('status'))
+                        <p class="mb-5 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900" role="status">{{ session('status') }}</p>
+                    @endif
+
                     @if ($errors->any())
                         <div class="mb-5 rounded-xl bg-rose-50 px-3.5 py-3 text-sm text-rose-800">
                             {{ $errors->first() }}
@@ -52,6 +56,7 @@
                         Ingat saya di perangkat ini
                     </label>
                     <button class="btn-primary mt-6 w-full" type="submit">Masuk</button>
+                    <a class="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-sky-800 underline underline-offset-4" href="{{ route('password.recovery') }}">Pulihkan kata sandi</a>
                 </form>
                 <p class="mt-4 text-center">
                     <a class="inline-flex min-h-11 items-center text-sm font-medium text-sky-300 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300" href="{{ route('privacy') }}">Pemberitahuan privasi</a>

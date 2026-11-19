@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\EmployeeIdentityImportService;
+use App\Rules\SafeUpload;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -29,7 +30,7 @@ class EmployeeIdentityImportController extends Controller
     public function preview(Request $request): RedirectResponse
     {
         $request->validate([
-            'file' => ['required', 'file', 'max:5120', 'mimes:csv,txt,xlsx'],
+            'file' => ['bail', 'required', 'file', 'mimes:csv,txt,xlsx', 'extensions:csv,txt,xlsx', 'max:5120', new SafeUpload],
         ], [
             'file.required' => 'Pilih file yang akan diimpor.',
             'file.mimes' => 'Gunakan file CSV atau Excel (.xlsx).',
@@ -44,8 +45,12 @@ class EmployeeIdentityImportController extends Controller
 
         try {
             $preview = $this->imports->preview($file);
-        } catch (\Throwable $exception) {
+        } catch (\InvalidArgumentException $exception) {
             return back()->withErrors(['file' => $exception->getMessage()]);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return back()->withErrors(['file' => 'File tidak dapat diproses. Periksa formatnya atau hubungi pengelola.']);
         }
 
         $path = $file->store('identity-imports', 'local');

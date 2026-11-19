@@ -12,10 +12,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable(['name', 'email', 'password', 'role', 'department_id'])]
-#[Hidden(['password', 'remember_token'])]
+#[Hidden(['password', 'remember_token', 'mfa_secret', 'mfa_last_step'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -38,7 +39,19 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'department_id' => 'integer',
             'password' => 'hashed',
+            'mfa_secret' => 'encrypted',
+            'mfa_last_step' => 'integer',
         ];
+    }
+
+    public function revokeDatabaseSessions(): void
+    {
+        if (config('session.driver') === 'database') {
+            DB::connection(config('session.connection'))
+                ->table(config('session.table'))
+                ->where('user_id', $this->getAuthIdentifier())
+                ->delete();
+        }
     }
 
     public function department(): BelongsTo

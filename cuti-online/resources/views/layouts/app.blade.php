@@ -116,6 +116,9 @@
                 <div class="mt-6 border-t border-slate-200 pt-5">
                     <p class="px-2 text-sm font-semibold text-slate-800">{{ $currentUser->name }}</p>
                     <p class="mt-0.5 px-2 text-xs text-slate-500">{{ $currentUser->roleLabel() }}</p>
+                    @if ($currentUser->canManageAccounts() && $currentUser->mfa_secret === null)
+                        <a class="mt-2 inline-flex min-h-11 items-center px-2 text-sm text-sky-800 underline underline-offset-4" href="{{ route('mfa.setup') }}">Aktifkan verifikasi dua langkah</a>
+                    @endif
                     @if ($currentUser->department)
                         <p class="mt-0.5 break-words px-2 text-xs text-slate-500">{{ $currentUser->department->name }}</p>
                     @endif

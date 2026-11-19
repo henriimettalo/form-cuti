@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ApiTokenController;
+use App\Http\Controllers\AdminMfaController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AuthorizedOfficialController;
 use App\Http\Controllers\CeremonyScheduleController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\OrganizationProfileController;
 use App\Http\Controllers\PayrollController;
+use App\Http\Controllers\PasswordRecoveryController;
 use App\Http\Controllers\PublicScheduleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserManagementController;
@@ -24,6 +26,10 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthController::class, 'create'])->name('login');
     Route::post('/login', [AuthController::class, 'store'])->middleware('throttle:5,1')->name('login.store');
+    Route::get('/verifikasi-admin', [AdminMfaController::class, 'challenge'])->name('mfa.challenge');
+    Route::post('/verifikasi-admin', [AdminMfaController::class, 'verify'])->middleware('throttle:5,1')->name('mfa.verify');
+    Route::get('/pemulihan-kata-sandi', [PasswordRecoveryController::class, 'create'])->name('password.recovery');
+    Route::post('/pemulihan-kata-sandi', [PasswordRecoveryController::class, 'store'])->middleware('throttle:5,1')->name('password.recovery.store');
 });
 
 Route::get('/jadwal-publik', [PublicScheduleController::class, 'index'])->name('public-schedules.index');
@@ -31,6 +37,8 @@ Route::get('/jadwal-publik/piket-kelurahan', [PublicScheduleController::class, '
 Route::view('/privasi', 'privacy')->name('privacy');
 
 Route::middleware('auth')->group(function (): void {
+    Route::get('/akun/verifikasi-dua-langkah', [AdminMfaController::class, 'setup'])->name('mfa.setup');
+    Route::post('/akun/verifikasi-dua-langkah', [AdminMfaController::class, 'enroll'])->middleware('throttle:5,1')->name('mfa.enroll');
     Route::middleware('role:super_admin,admin_unit,pengguna')->group(function (): void {
         Route::get('/', DashboardController::class)->name('dashboard');
         Route::get('/jadwal-apel-upacara', [CeremonyScheduleController::class, 'index'])->name('ceremony-schedules.index');

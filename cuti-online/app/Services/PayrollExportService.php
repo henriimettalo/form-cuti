@@ -150,7 +150,7 @@ class PayrollExportService
                 $column = Coordinate::stringFromColumnIndex($index + 1);
                 $cell = $column.$dataRow;
 
-                if (in_array($column, self::TEXT_COLUMNS, true)) {
+                if (is_string($value) || in_array($column, self::TEXT_COLUMNS, true)) {
                     $sheet->setCellValueExplicit($cell, (string) ($value ?? ''), DataType::TYPE_STRING);
                 } else {
                     $sheet->setCellValue($cell, $value);
@@ -261,7 +261,7 @@ class PayrollExportService
                 $column = Coordinate::stringFromColumnIndex($index + 1);
                 $cell = $column.$dataRow;
 
-                if (in_array($column, self::TPP_TEXT_COLUMNS, true)) {
+                if (is_string($value) || in_array($column, self::TPP_TEXT_COLUMNS, true)) {
                     $sheet->setCellValueExplicit($cell, (string) ($value ?? ''), DataType::TYPE_STRING);
                 } else {
                     $sheet->setCellValue($cell, $value);

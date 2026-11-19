@@ -3,15 +3,28 @@ x-laravel-database: &laravel-database
   DB_HOST: postgres
   DB_PORT: 5432
   DB_DATABASE: ${POSTGRES_DB:?Atur POSTGRES_DB pada .env.production}
-  DB_USERNAME: ${POSTGRES_USER:?Atur POSTGRES_USER pada .env.production}
-  DB_PASSWORD: ${POSTGRES_PASSWORD:?Atur POSTGRES_PASSWORD pada .env.production}
+  DB_URL: ""
+
+x-runtime-database: &runtime-database
+  <<: *laravel-database
+  DB_USERNAME: ${SIMPEG_DB_USER:-cuti_online_app}
+  DB_PASSWORD: ${SIMPEG_DB_PASSWORD:?Atur SIMPEG_DB_PASSWORD pada .env.production}
+  POSTGRES_USER: ""
+  POSTGRES_PASSWORD: ""
+  SESSION_ENCRYPT: "true"
+  SCAN_UPLOADS: "true"
 
 services:
   init:
     image: cuti-online-app:latest
     env_file:
       - ${APP_ENV_FILE:-.env.production}
-    environment: *laravel-database
+    environment:
+      <<: *laravel-database
+      DB_USERNAME: ${POSTGRES_USER:?Atur POSTGRES_USER pada .env.production}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Atur POSTGRES_PASSWORD pada .env.production}
+      SIMPEG_DB_USER: ${SIMPEG_DB_USER:-cuti_online_app}
+      SIMPEG_DB_PASSWORD: ${SIMPEG_DB_PASSWORD:?Atur SIMPEG_DB_PASSWORD pada .env.production}
     user: "0:0"
     restart: "no"
     depends_on:
@@ -33,6 +46,7 @@ services:
           storage/logs
         chown -R www-data:www-data storage
         php artisan migrate --seed --seeder=LeaveTypeSeeder --force
+        php artisan app:provision-runtime-db --no-interaction
         cp -a public/. /shared-public/
 
   app:
@@ -42,7 +56,7 @@ services:
     image: cuti-online-app:latest
     env_file:
       - ${APP_ENV_FILE:-.env.production}
-    environment: *laravel-database
+    environment: *runtime-database
     restart: unless-stopped
     depends_on:
       init:
@@ -63,7 +77,7 @@ services:
     image: cuti-online-app:latest
     env_file:
       - ${APP_ENV_FILE:-.env.production}
-    environment: *laravel-database
+    environment: *runtime-database
     command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
     restart: unless-stopped
     depends_on:
@@ -76,7 +90,7 @@ services:
     image: cuti-online-app:latest
     env_file:
       - ${APP_ENV_FILE:-.env.production}
-    environment: *laravel-database
+    environment: *runtime-database
     command: php artisan schedule:work
     restart: unless-stopped
     depends_on:
@@ -84,6 +98,19 @@ services:
         condition: service_completed_successfully
     volumes:
       - app_storage:/var/www/html/storage
+
+  clamav:
+    image: clamav/clamav-debian:stable
+    restart: unless-stopped
+    volumes:
+      - clamav_database:/var/lib/clamav
+      - ./docker/clamav/clamd.conf:/etc/clamav/clamd.conf:ro
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping", "1"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 90s
 
   web:
     image: nginx:1.28-alpine
@@ -101,3 +128,4 @@ services:
 volumes:
   app_public:
   app_storage:
+  clamav_database:

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DocumentTemplate;
 use App\Services\LeaveTemplatePlaceholderResolver;
+use App\Rules\SafeUpload;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -31,7 +32,7 @@ class DocumentTemplateController extends Controller
     {
         $data = $request->validate([
             'name' => ['nullable', 'string', 'max:255'],
-            'file' => ['required', 'file', 'mimes:docx', 'max:10240'],
+            'file' => ['bail', 'required', 'file', 'mimes:docx', 'extensions:docx', 'max:10240', new SafeUpload],
         ]);
 
         /** @var UploadedFile $file */

@@ -7,6 +7,7 @@ use App\Models\EmployeeImport;
 use App\Services\EmployeeImportService;
 use App\Services\EmployeeOnboardingService;
 use Illuminate\Database\QueryException;
+use App\Rules\SafeUpload;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -48,7 +49,7 @@ class EmployeeImportController extends Controller
     public function upload(Request $request): RedirectResponse
     {
         $request->validate([
-            'file' => ['required', 'file', 'max:5120', 'mimes:csv,txt,xlsx'],
+            'file' => ['bail', 'required', 'file', 'mimes:csv,txt,xlsx', 'extensions:csv,txt,xlsx', 'max:5120', new SafeUpload],
         ], [
             'file.required' => 'Pilih file yang akan diimpor.',
             'file.mimes' => 'Gunakan file CSV atau Excel (.xlsx).',

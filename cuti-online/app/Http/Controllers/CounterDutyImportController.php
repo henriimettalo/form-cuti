@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\CounterDutyImportService;
+use App\Rules\SafeUpload;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -24,7 +25,7 @@ class CounterDutyImportController extends Controller
         $this->ensureCanManage($request);
         $request->session()->forget('counter-duty-import-preview');
         $input = $request->validate([
-            'file' => ['required', 'file', 'mimes:xlsx', 'max:5120'],
+            'file' => ['bail', 'required', 'file', 'mimes:xlsx', 'extensions:xlsx', 'max:5120', new SafeUpload],
             'year' => ['required', 'integer', 'between:1900,2100'],
         ], [], ['file' => 'file jadwal', 'year' => 'tahun impor']);
         $preview = $imports->preview($request->file('file'), (int) $input['year']);

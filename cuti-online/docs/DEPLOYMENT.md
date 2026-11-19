@@ -48,7 +48,7 @@ Jalankan dari direktori aplikasi di VPS.
 cp .env.production.example .env.production
 ```
 
-Edit `.env.production`, lalu ganti minimal `POSTGRES_PASSWORD` dengan password acak yang panjang. Nilai `APP_HTTP_PORT=8088` hanya dapat diakses dari VPS sendiri, bukan dari internet. Jangan mengunggah berkas ini ke Git atau membagikannya.
+Edit `.env.production` dan isi `POSTGRES_PASSWORD` serta `SIMPEG_DB_PASSWORD` dengan dua kata sandi acak yang berbeda. Kata sandi runtime minimal 32 karakter. Nilai `APP_HTTP_PORT=8088` hanya dapat diakses dari VPS sendiri, bukan dari internet. Jangan mengunggah berkas ini ke Git atau membagikannya.
 
 Buat `APP_KEY` baru:
 
@@ -64,13 +64,19 @@ docker compose --env-file .env.production -f compose.yaml -f compose.production.
 docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml ps
 ```
 
-Layanan `init` menjalankan migrasi database, menambahkan jenis cuti bawaan yang belum ada, dan menyalin aset hasil build. Jangan menjalankan `migrate:fresh` pada VPS karena perintah tersebut menghapus data.
+Layanan `init` menjalankan migrasi, menyiapkan akun PostgreSQL runtime dengan hak baca dan tulis data aplikasi, lalu menyalin aset hasil build. Layanan app, worker, dan scheduler memakai akun runtime. Layanan ClamAV berjalan di jaringan Docker. Unggahan ditolak jika pemeriksaan malware tidak tersedia. Jangan menjalankan `migrate:fresh` pada VPS karena perintah tersebut menghapus data.
+
+Saat memperbarui instalasi lama, tambahkan `SIMPEG_DB_USER=cuti_online_app` dan `SIMPEG_DB_PASSWORD` ke `.env.production` sebelum menjalankan Compose. Pengguna perlu masuk kembali saat enkripsi sesi pertama kali diaktifkan. Token API yang sebelumnya tanpa batas memperoleh waktu 90 hari untuk rotasi.
 
 Buat akun administrator pertama:
 
 ```bash
 docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml exec app php artisan app:create-admin "Nama Admin" admin@kecamatanpontianakselatan.web.id
 ```
+
+Admin dapat menyiapkan MFA dari tautan **Aktifkan verifikasi dua langkah** di menu akun. Biarkan `REQUIRE_ADMIN_MFA=false` saat migrasi akun yang sudah ada. Setelah setiap Super Admin dan Admin Unit mendaftarkan perangkat dan memastikan dapat masuk menggunakan MFA, setel `REQUIRE_ADMIN_MFA=true` lalu buat ulang container app.
+
+Untuk pemulihan akun, verifikasi identitas pemilik akun melalui prosedur instansi. Jalankan `php artisan app:issue-password-recovery` melalui terminal container app dan berikan kode 30 menit secara privat. Pengguna memasukkannya melalui tautan **Pulihkan kata sandi** di halaman login. Jangan menyalin kode ke tiket dukungan atau log. Jika perangkat autentikator hilang, gunakan `php artisan app:clear-admin-mfa` setelah verifikasi untuk mencabut sesi serta token dan mengizinkan pendaftaran perangkat baru.
 
 ## Verifikasi
 

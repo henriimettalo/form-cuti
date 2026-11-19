@@ -37,6 +37,20 @@ class EnsureRole
                 ->withErrors(['email' => 'Akun diblokir karena unit kerja Anda sedang nonaktif.']);
         }
 
+        if (! $request->is('api/*')) {
+            if ($user->mfa_secret !== null && $request->session()->get('mfa_user') !== $user->id) {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return to_route('login');
+            }
+
+            if ($user->canManageAccounts() && $user->mfa_secret === null && config('security.require_admin_mfa')) {
+                return to_route('mfa.setup');
+            }
+        }
+
         return $next($request);
     }
 }

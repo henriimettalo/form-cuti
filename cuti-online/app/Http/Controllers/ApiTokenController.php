@@ -25,18 +25,20 @@ class ApiTokenController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $abilityKeys = array_keys(config('api.abilities'));
+        $today = CarbonImmutable::today(config('app.timezone'));
+        $latest = $today->addDays(90);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
             'abilities' => ['required', 'array', 'min:1'],
             'abilities.*' => [Rule::in($abilityKeys)],
-            'expires_at' => ['nullable', 'date', 'after:today'],
+            'expires_at' => ['nullable', 'date_format:Y-m-d', 'after:'.$today->toDateString(), 'before_or_equal:'.$latest->toDateString()],
         ], [
             'abilities.required' => 'Pilih minimal satu izin untuk token.',
             'abilities.min' => 'Pilih minimal satu izin untuk token.',
         ]);
         $expiresAt = isset($data['expires_at'])
-            ? CarbonImmutable::parse($data['expires_at'])->endOfDay()
-            : null;
+            ? CarbonImmutable::parse($data['expires_at'], $today->timezone)->endOfDay()
+            : $latest->endOfDay();
         $token = $request->user()->createToken($data['name'], $data['abilities'], $expiresAt);
 
         return to_route('api-tokens.index')

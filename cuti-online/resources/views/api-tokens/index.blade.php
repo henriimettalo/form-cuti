@@ -53,7 +53,7 @@
                 <div>
                     <label class="form-label" for="expires_at">Berlaku sampai</label>
                     <input class="form-input" id="expires_at" name="expires_at" type="date" value="{{ old('expires_at') }}">
-                    <p class="form-help">Opsional. Token tanpa tanggal kedaluwarsa berlaku sampai dicabut.</p>
+                    <p class="form-help">Kosongkan untuk masa berlaku 90 hari. Tanggal yang dipilih tidak boleh melebihi 90 hari.</p>
                     @error('expires_at') <p class="form-error">{{ $message }}</p> @enderror
                 </div>
 
