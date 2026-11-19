@@ -1,5 +1,7 @@
 @extends('layouts.public')
 @section('title', 'Jadwal Piket Kelurahan')
+@section('description', 'Lihat jadwal piket kelurahan Kecamatan Pontianak Selatan untuk kemarin, hari ini, dan besok.')
+@section('share-url', route('public-schedules.kelurahan'))
 @section('content')
     <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -14,7 +16,30 @@
         @if ($kelurahans->isEmpty())
             <p class="text-sm text-slate-500">Belum ada kelurahan aktif.</p>
         @else
-            <div class="overflow-x-auto rounded-xl border border-slate-200">
+            <ol class="divide-y divide-slate-200 lg:hidden print:hidden" aria-label="Daftar jadwal piket kelurahan" data-public-schedule-list>
+                @foreach ($dates as $date)
+                    @php($daySchedules = $schedules->get($date->toDateString(), collect()))
+                    <li class="py-4 first:pt-0 last:pb-0">
+                        <h2 class="font-semibold text-slate-900">
+                            {{ $date->lessThan($today) ? 'Kemarin' : ($date->isSameDay($today) ? 'Hari ini' : 'Besok') }}
+                            <time class="block text-sm font-normal text-slate-600" datetime="{{ $date->toDateString() }}">{{ $date->locale('id')->translatedFormat('l, j F Y') }}</time>
+                        </h2>
+                        @forelse ($daySchedules->groupBy('department_id') as $departmentId => $unitSchedules)
+                            <div class="mt-3 text-sm text-slate-700">
+                                <h3 class="font-semibold text-slate-900">{{ $kelurahans->firstWhere('id', $departmentId)?->name }}</h3>
+                                @foreach ($unitSchedules as $schedule)
+                                    <div class="mt-2">
+                                        @include('public-schedules.kelurahan-entry')
+                                    </div>
+                                @endforeach
+                            </div>
+                        @empty
+                            <p class="mt-2 text-sm text-slate-600">Belum ada jadwal.</p>
+                        @endforelse
+                    </li>
+                @endforeach
+            </ol>
+            <div class="hidden overflow-x-auto rounded-xl border border-slate-200 lg:block print:block" data-public-kelurahan-table>
                 <table class="w-full border-collapse text-left text-sm">
                     <thead class="bg-emerald-50 text-slate-700">
                         <tr>
@@ -37,11 +62,7 @@
                                     <td class="border-b border-r border-slate-200 px-3 py-3 align-top">
                                         @forelse ($daySchedules->where('department_id', $kelurahan->id) as $schedule)
                                             <div class="{{ $loop->first ? '' : 'mt-3 border-t border-slate-200 pt-3' }}">
-                                                <p class="font-semibold {{ $isPast ? '' : 'text-sky-700' }}">Kelompok {{ $schedule->group_number }}</p>
-                                                <p class="mt-1 font-medium">{{ $schedule->coordinator }}</p>
-                                                @foreach ($schedule->members ?? [] as $member)
-                                                    <p class="mt-1">{{ $member }}</p>
-                                                @endforeach
+                                                @include('public-schedules.kelurahan-entry')
                                             </div>
                                         @empty
                                             <p class="text-slate-500">Belum ada jadwal.</p>

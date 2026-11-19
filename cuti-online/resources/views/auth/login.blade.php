@@ -4,6 +4,9 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Masuk · SIMPEG</title>
+        <x-favicon />
+        <meta name="description" content="Masuk ke SIMPEG untuk mengakses layanan kepegawaian Kecamatan Pontianak Selatan.">
+        <meta name="robots" content="noindex">
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="min-h-screen bg-slate-950">
@@ -27,7 +30,7 @@
 
                     <div>
                         <label class="form-label" for="email">Email</label>
-                        <input class="form-input" id="email" type="email" name="email" value="{{ old('email') }}" maxlength="255" autocomplete="email" required autofocus>
+                        <input class="form-input" id="email" type="email" name="email" value="{{ old('email') }}" maxlength="255" autocomplete="email" spellcheck="false" required>
                     </div>
                     <div class="mt-4">
                         <label class="form-label" for="password">Kata sandi</label>
@@ -50,6 +53,9 @@
                     </label>
                     <button class="btn-primary mt-6 w-full" type="submit">Masuk</button>
                 </form>
+                <p class="mt-4 text-center">
+                    <a class="inline-flex min-h-11 items-center text-sm font-medium text-sky-300 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300" href="{{ route('privacy') }}">Pemberitahuan privasi</a>
+                </p>
             </div>
         </main>
     </body>

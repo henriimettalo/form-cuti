@@ -17,16 +17,12 @@ class EnsureRole
     {
         $user = $request->user();
 
-        $isLegacyOperator = $user instanceof User
-            && strtolower(trim((string) $user->role)) === 'operator';
-        $canUseLegacyRoute = $isLegacyOperator && in_array(User::ROLE_SUPER_ADMIN, $roles, true);
-
         abort_unless(
-            $user instanceof User && ($user->hasAnyRole(...$roles) || $canUseLegacyRoute),
+            $user instanceof User && $user->hasAnyRole(...$roles),
             403,
         );
 
-        if (! $canUseLegacyRoute && ! $user->isSuperAdmin() && ! $user->department?->is_active) {
+        if (! $user->isSuperAdmin() && ! $user->department?->is_active) {
             if ($request->expectsJson()) {
                 return response()->json([
                     'message' => 'Akun diblokir karena unit kerja Anda sedang nonaktif.',
@@ -40,8 +36,6 @@ class EnsureRole
             return to_route('login')
                 ->withErrors(['email' => 'Akun diblokir karena unit kerja Anda sedang nonaktif.']);
         }
-
-        abort_if(! $canUseLegacyRoute && ! $user->isSuperAdmin() && $user->department_id === null, 403);
 
         return $next($request);
     }

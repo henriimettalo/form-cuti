@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\LeaveType;
 use Database\Seeders\LeaveTypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
@@ -49,5 +50,16 @@ class LeaveSchemaTest extends TestCase
             'code' => 'annual',
             'name' => 'Cuti Tahunan',
         ]);
+    }
+
+    public function test_reseeding_leave_types_preserves_existing_settings(): void
+    {
+        $this->seed(LeaveTypeSeeder::class);
+        LeaveType::query()->where('code', 'annual')->update(['is_active' => false]);
+
+        $this->seed(LeaveTypeSeeder::class);
+
+        $this->assertDatabaseCount('leave_types', 6);
+        $this->assertDatabaseHas('leave_types', ['code' => 'annual', 'is_active' => false]);
     }
 }

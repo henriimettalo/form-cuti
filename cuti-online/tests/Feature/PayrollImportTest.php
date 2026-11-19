@@ -91,11 +91,12 @@ class PayrollImportTest extends TestCase
             ->assertSee('6171052401900001')
             ->assertDontSee('Rp 1.209.928');
 
-        $this->actingAs(User::factory()->create(['role' => 'operator']))
+        $this->actingAs(User::factory()->create([
+            'role' => 'operator',
+            'department_id' => $employee->department_id,
+        ]))
             ->get(route('employees.show', $employee))
-            ->assertOk()
-            ->assertDontSee('6171052401900001')
-            ->assertSee('hanya ditampilkan untuk admin/pejabat berwenang');
+            ->assertForbidden();
 
     }
 

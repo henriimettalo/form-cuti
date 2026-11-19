@@ -19,11 +19,18 @@ class PublicScheduleTest extends TestCase
             'event_date' => '2026-10-12',
             'ceremony_group_number' => 3,
         ]);
+        CeremonySchedule::query()->create([
+            'title' => 'Upacara lama Oktober',
+            'type' => 'upacara',
+            'event_date' => '2026-10-12',
+            'ceremony_group_number' => 5,
+        ]);
 
         $this->get(route('public-schedules.index', ['tab' => 'apel', 'month' => '2026-10']))
             ->assertOk()
             ->assertSee('Apel / Upacara Oktober 2026')
             ->assertSee('Kelompok 3')
+            ->assertSee('Kelompok 5')
             ->assertSee('View only')
             ->assertDontSee('Simpan kalender');
     }
@@ -97,5 +104,27 @@ class PublicScheduleTest extends TestCase
         $this->get(route('public-schedules.index', ['tab' => 'kelurahan']))->assertOk()
             ->assertDontSee('aria-label="Menu jadwal publik"', false)
             ->assertSee('Jadwal piket kelurahan')->assertSee('Kembali ke pilihan jadwal');
+    }
+
+    public function test_public_pages_offer_privacy_and_use_page_specific_share_metadata(): void
+    {
+        $apelUrl = route('public-schedules.index', ['tab' => 'apel', 'month' => '2026-11']);
+        $this->get($apelUrl)->assertOk()
+            ->assertSee('<title>Jadwal Apel / Upacara November 2026 · SIMPEG</title>', false)
+            ->assertSee('<meta property="og:url" content="'.e($apelUrl).'">', false)
+            ->assertSee('<meta property="og:image" content="'.asset('jadwal-preview.png').'">', false)
+            ->assertSee(route('privacy'));
+        $this->get(route('public-schedules.index', ['tab' => 'piket', 'month' => '2026-11']))->assertOk()
+            ->assertSee('<title>Jadwal Piket Loket November 2026 · SIMPEG</title>', false);
+        Department::query()->create(['name' => 'Kelurahan Uji', 'department_type' => 'kelurahan', 'is_active' => true]);
+        $this->get(route('public-schedules.kelurahan'))->assertOk()
+            ->assertSee('<title>Jadwal Piket Kelurahan · SIMPEG</title>', false)
+            ->assertSee('data-public-schedule-list', false);
+
+        $this->get(route('login'))->assertOk()->assertSee(route('privacy'));
+        $this->get(route('privacy'))->assertOk()->assertSee('kec.ptk.selatan@pontianak.go.id');
+        $this->get('/alamat-uji-yang-tidak-ada')->assertNotFound()
+            ->assertSee('Halaman tidak ditemukan')
+            ->assertSee(route('public-schedules.index'));
     }
 }

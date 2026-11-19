@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\DutyHoliday;
 use App\Models\Holiday;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -35,16 +36,26 @@ class LeaveDurationCalculator
 
     private function countWorkingDays(CarbonImmutable $start, CarbonImmutable $end): int
     {
-        $holidayDates = Holiday::query()
-            ->whereBetween('holiday_date', [$start->toDateString(), $end->toDateString()])
+        // The exclusive upper bound also covers legacy SQLite values with a time component.
+        $firstDay = $start->toDateString();
+        $dayAfterEnd = $end->addDay()->toDateString();
+        $legacyHolidays = Holiday::query()
+            ->where('holiday_date', '>=', $firstDay)
+            ->where('holiday_date', '<', $dayAfterEnd)
+            ->pluck('holiday_date');
+        $holidayDates = DutyHoliday::query()
+            ->where('holiday_date', '>=', $firstDay)
+            ->where('holiday_date', '<', $dayAfterEnd)
             ->pluck('holiday_date')
+            ->merge($legacyHolidays)
             ->map(fn ($date): string => CarbonImmutable::parse($date)->toDateString())
+            ->flip()
             ->all();
 
         $total = 0;
 
         foreach (CarbonPeriod::create($start, $end) as $date) {
-            if (! $date->isWeekend() && ! in_array($date->toDateString(), $holidayDates, true)) {
+            if (! $date->isWeekend() && ! isset($holidayDates[$date->toDateString()])) {
                 $total++;
             }
         }

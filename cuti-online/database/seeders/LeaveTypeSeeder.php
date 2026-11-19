@@ -11,7 +11,7 @@ class LeaveTypeSeeder extends Seeder
     {
         $timestamp = now();
 
-        LeaveType::query()->upsert([
+        LeaveType::query()->insertOrIgnore([
             [
                 'code' => 'annual',
                 'name' => 'Cuti Tahunan',
@@ -60,6 +60,6 @@ class LeaveTypeSeeder extends Seeder
                 'created_at' => $timestamp,
                 'updated_at' => $timestamp,
             ],
-        ], ['code'], ['name', 'requires_attachment', 'is_active', 'updated_at']);
+        ]);
     }
 }

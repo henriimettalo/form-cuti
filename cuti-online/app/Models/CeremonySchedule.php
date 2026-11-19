@@ -3,12 +3,15 @@
 namespace App\Models;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CeremonySchedule extends Model
 {
+    public const HOLIDAY_NOTES = ['Libur', 'Libur bersama'];
+
     public const TYPES = [
         'apel' => 'Apel / Upacara',
         'piket_loket' => 'Piket Loket',
@@ -54,6 +57,13 @@ class CeremonySchedule extends Model
     public function dutyGroup(): BelongsTo
     {
         return $this->belongsTo(DutyGroup::class);
+    }
+
+    public function scopeWithoutHolidayPlaceholders(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $query) => $query
+            ->whereNull('notes')
+            ->orWhereNotIn('notes', self::HOLIDAY_NOTES));
     }
 
     protected function eventDate(): Attribute

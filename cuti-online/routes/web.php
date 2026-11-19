@@ -28,6 +28,7 @@ Route::middleware('guest')->group(function (): void {
 
 Route::get('/jadwal-publik', [PublicScheduleController::class, 'index'])->name('public-schedules.index');
 Route::get('/jadwal-publik/piket-kelurahan', [PublicScheduleController::class, 'kelurahan'])->name('public-schedules.kelurahan');
+Route::view('/privasi', 'privacy')->name('privacy');
 
 Route::middleware('auth')->group(function (): void {
     Route::middleware('role:super_admin,admin_unit,pengguna')->group(function (): void {
@@ -42,6 +43,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/formulir-cuti/buat', [LeaveRequestController::class, 'create'])->name('leave-requests.create');
         Route::post('/formulir-cuti', [LeaveRequestController::class, 'store'])->name('leave-requests.store');
         Route::get('/formulir-cuti/{leaveRequest}', [LeaveRequestController::class, 'show'])->name('leave-requests.show');
+        Route::post('/formulir-cuti/{leaveRequest}/dokumen', [LeaveRequestController::class, 'generateDocument'])->name('leave-requests.documents.generate');
         Route::get('/dokumen/{generatedDocument}/unduh', [LeaveRequestController::class, 'download'])->name('documents.download');
     });
 

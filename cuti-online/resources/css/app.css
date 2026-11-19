@@ -372,7 +372,7 @@
         z-index: 30;
         top: calc(100% + 0.5rem);
         left: 0;
-        width: 16rem;
+        width: min(16rem, calc(100vw - 4rem));
         border-radius: 1rem;
         background: white;
         padding: 0.875rem;
@@ -389,7 +389,7 @@
     }
 
     .month-picker-year {
-        min-height: 2.25rem;
+        min-height: 2.75rem;
         border-radius: 0.625rem;
         border: 0;
         background: rgb(241 245 249);
@@ -407,7 +407,7 @@
     }
 
     .month-picker-option {
-        min-height: 2.25rem;
+        min-height: 2.75rem;
         border-radius: 0.625rem;
         color: rgb(51 65 85);
         font-size: 0.8125rem;
@@ -415,9 +415,14 @@
     }
 
     .month-picker-option:hover,
-    .month-picker-option[aria-selected='true'] {
-        background: rgb(2 132 199);
+    .month-picker-option[aria-pressed='true'] {
+        background: rgb(3 105 161);
         color: white;
+    }
+
+    .month-picker-option:focus-visible {
+        outline: 2px solid rgb(3 105 161);
+        outline-offset: 2px;
     }
 
     .form-input[type='file'] {

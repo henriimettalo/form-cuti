@@ -55,6 +55,12 @@
                 @empty
                     <p class="card-inner text-sm text-slate-500">Dokumen belum tersedia.</p>
                 @endforelse
+                @if ($leaveRequest->status === 'draft')
+                    <form method="POST" action="{{ route('leave-requests.documents.generate', $leaveRequest) }}">
+                        @csrf
+                        <button class="btn-primary w-full" type="submit">Coba buat dokumen lagi</button>
+                    </form>
+                @endif
             </div>
         </aside>
     </div>

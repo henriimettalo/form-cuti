@@ -12,11 +12,11 @@
     $monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
 @endphp
 <div class="month-picker" data-month-picker data-month-value="{{ $value }}" data-month-picker-auto-submit="{{ $autoSubmit ? 'true' : 'false' }}">
-    <button class="form-input month-picker-trigger" id="{{ $id }}-trigger" type="button" data-month-picker-trigger aria-haspopup="dialog" aria-expanded="false">
-        <span data-month-picker-label>{{ $selectedMonth->locale('id')->translatedFormat('F Y') }}</span>
+    <button class="form-input month-picker-trigger" id="{{ $id }}-trigger" type="button" data-month-picker-trigger aria-haspopup="dialog" aria-controls="{{ $id }}-popover" aria-expanded="false">
+        <span class="sr-only">Pilih bulan: </span><span data-month-picker-label>{{ $selectedMonth->locale('id')->translatedFormat('F Y') }}</span>
         <svg aria-hidden="true" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" /></svg>
     </button>
-    <div class="month-picker-popover" data-month-picker-popover hidden>
+    <div class="month-picker-popover" id="{{ $id }}-popover" data-month-picker-popover role="dialog" aria-label="Pilih bulan dan tahun" hidden>
         <div class="month-picker-header">
             <span class="text-sm font-semibold text-slate-800">Pilih bulan</span>
             <select class="month-picker-year" data-month-picker-year aria-label="Tahun">
@@ -25,9 +25,9 @@
                 @endforeach
             </select>
         </div>
-        <div class="month-picker-grid" role="listbox" aria-label="Bulan">
+        <div class="month-picker-grid" role="group" aria-label="Bulan">
             @foreach (range(1, 12) as $monthNumber)
-                <button type="button" class="month-picker-option" data-month-picker-month="{{ str_pad($monthNumber, 2, '0', STR_PAD_LEFT) }}" role="option" aria-label="{{ $monthLabels[$monthNumber - 1] }}">{{ $monthLabels[$monthNumber - 1] }}</button>
+                <button type="button" class="month-picker-option" data-month-picker-month="{{ str_pad($monthNumber, 2, '0', STR_PAD_LEFT) }}" aria-pressed="{{ $selectedMonth->month === $monthNumber ? 'true' : 'false' }}">{{ $monthLabels[$monthNumber - 1] }}</button>
             @endforeach
         </div>
     </div>

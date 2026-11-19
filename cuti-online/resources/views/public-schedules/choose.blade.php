@@ -1,5 +1,7 @@
 @extends('layouts.public')
 @section('title', 'Jadwal Publik')
+@section('description', 'Lihat jadwal apel dan upacara, piket kecamatan, serta piket kelurahan di Kecamatan Pontianak Selatan.')
+@section('share-url', route('public-schedules.index'))
 @section('content')
     <h1 class="page-title">Jadwal publik</h1>
     <p class="page-description">Pilih jadwal yang ingin dilihat. Tidak perlu masuk ke sistem; semua jadwal hanya untuk dibaca.</p>

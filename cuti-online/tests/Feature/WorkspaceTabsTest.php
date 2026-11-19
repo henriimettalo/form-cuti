@@ -12,7 +12,7 @@ class WorkspaceTabsTest extends TestCase
 
     public function test_authenticated_layout_exposes_temporary_workspace_tabs(): void
     {
-        $user = User::factory()->create(['role' => 'operator']);
+        $user = User::factory()->create();
 
         $this->actingAs($user)
             ->get(route('dashboard'))
@@ -30,7 +30,7 @@ class WorkspaceTabsTest extends TestCase
 
     public function test_non_dashboard_initial_tab_can_return_to_dashboard(): void
     {
-        $user = User::factory()->create(['role' => 'operator']);
+        $user = User::factory()->create();
 
         $this->actingAs($user)
             ->get(route('leave-requests.create'))

@@ -24,6 +24,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class LeaveRequestController extends Controller
 {
@@ -296,21 +297,57 @@ class LeaveRequestController extends Controller
             throw $exception;
         }
 
-        $leaveRequest->load([
-            'employee.department',
-            'employee.position',
-            'leaveType',
-            'leaveBalanceSnapshot',
-            'documentTemplate',
-        ]);
-        $documentGenerator->generate($leaveRequest);
-        $leaveRequest->update([
-            'status' => 'generated',
-            'generated_at' => now(),
-        ]);
+        return $this->generateDocument($request, $leaveRequest, $documentGenerator);
+    }
+
+    public function generateDocument(
+        Request $request,
+        LeaveRequest $leaveRequest,
+        LeaveDocumentGenerator $documentGenerator,
+    ): RedirectResponse {
+        $this->ensureLeaveRequestIsVisibleTo($leaveRequest, $request->user());
+
+        try {
+            $generated = DB::transaction(function () use ($leaveRequest, $documentGenerator): bool {
+                // Take a write lock before touching the DOCX so retries also serialize on SQLite.
+                $draft = LeaveRequest::query()
+                    ->whereKey($leaveRequest->id)
+                    ->where('status', 'draft')
+                    ->toBase()
+                    ->update(['status' => 'draft']);
+
+                if ($draft === 0) {
+                    return false;
+                }
+
+                $lockedRequest = LeaveRequest::query()->findOrFail($leaveRequest->id);
+                $document = $lockedRequest->generatedDocuments()->latest('id')->first();
+
+                if ($document === null || ! Storage::disk('local')->exists($document->storage_path)) {
+                    $document?->delete();
+                    $document = $documentGenerator->generate($lockedRequest);
+                }
+
+                $lockedRequest->update([
+                    'status' => 'generated',
+                    'generated_at' => $document->generated_at,
+                ]);
+
+                return true;
+            });
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return to_route('leave-requests.show', $leaveRequest)
+                ->withErrors(['document' => 'Formulir sudah tersimpan, tetapi dokumen Word gagal dibuat. Silakan coba lagi.']);
+        }
+
+        if (! $generated) {
+            return $this->existingRequestResponse($leaveRequest);
+        }
 
         return to_route('leave-requests.show', $leaveRequest)
-            ->with('status', 'Formulir berhasil dibuat dan dokumen Word siap diunduh.');
+            ->with('status', 'Dokumen Word siap diunduh.');
     }
 
     public function show(Request $request, LeaveRequest $leaveRequest): View

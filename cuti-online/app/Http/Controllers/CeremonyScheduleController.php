@@ -10,6 +10,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -24,7 +25,8 @@ class CeremonyScheduleController extends Controller
         $filters = $request->validate([
             'month' => ['nullable', 'date_format:Y-m'],
             'type' => ['nullable', Rule::in(array_keys(CeremonySchedule::TYPES))],
-            'calendar_month' => ['nullable', 'integer', 'between:1,12'],
+            'year' => ['nullable', 'integer', 'between:2026,2030'],
+            'calendar_month' => ['nullable', 'integer', 'between:0,12'],
             'calendar_sort' => ['nullable', Rule::in(['asc', 'desc'])],
         ], [], ['month' => 'bulan', 'type' => 'jenis kegiatan']);
 
@@ -42,23 +44,37 @@ class CeremonyScheduleController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        $year = (int) ($filters['year'] ?? $month->year);
+        $today = now('Asia/Pontianak');
+        $canManage = $request->user()->isSuperAdmin();
+        $days = $this->mondayCalendar($year);
+        $calendarSchedules = $this->calendarSchedules($year);
+        $holidays = $this->calendarHolidays($year);
+        $departments = $this->ceremonyDepartments();
+        $groups = $departments->whereNotNull('ceremony_group_number')->keyBy('ceremony_group_number')->sortKeys();
+        $groupCount = max(2, (int) ($groups->keys()->max() ?? 4));
+        $suggestions = $canManage && $groups->count() === $groupCount
+            ? $this->calendarSuggestions($days, $calendarSchedules, $holidays, $groups->keys()->all(), $today->toDateString())
+            : [];
+
         return view('ceremony-schedules.index', [
             'schedules' => $schedules,
             'month' => $month,
             'type' => $type,
             'types' => CeremonySchedule::TYPES,
-            'canManage' => $request->user()->isSuperAdmin(),
-            'rotationYears' => CeremonySchedule::query()->where('type', 'apel')->whereNotNull('rotation_start_department_id')->get()->groupBy(fn ($schedule) => $schedule->event_date->format('Y')),
-            'calendarYear' => (int) ($request->input('year', $month->year)),
-            'calendarYears' => range(now('Asia/Pontianak')->year, now('Asia/Pontianak')->year + 4),
-            'calendarDays' => $this->mondayCalendar((int) ($request->input('year', $month->year))),
-            'calendarMonth' => (int) ($request->input('calendar_month', ((int) $request->input('year', $month->year) === now('Asia/Pontianak')->year ? now('Asia/Pontianak')->month : 0))),
-            'calendarSort' => $request->input('calendar_sort', 'asc'),
-            'calendarSchedules' => CeremonySchedule::query()->where('type', 'apel')->whereYear('event_date', (int) ($request->input('year', $month->year)))->with('department')->get()->keyBy(fn ($schedule) => $schedule->event_date->toDateString()),
-            'sharedHolidays' => DutyHoliday::query()->whereYear('holiday_date', (int) ($request->input('year', $month->year)))->get()->keyBy(fn ($holiday) => $holiday->holiday_date->toDateString()),
-            'ceremonyDepartments' => $this->ceremonyDepartments(),
-            'groupDepartments' => $this->ceremonyDepartments()->whereNotNull('ceremony_group_number')->keyBy('ceremony_group_number'),
-            'groupCount' => max(2, (int) (Department::query()->whereIn('department_type', ['kecamatan', 'kelurahan'])->max('ceremony_group_number') ?? 4)),
+            'canManage' => $canManage,
+            'calendarYear' => $year,
+            'calendarYears' => range(2026, 2030),
+            'calendarDays' => $days,
+            'calendarMonth' => (int) ($filters['calendar_month'] ?? ($year === $today->year ? $today->month : 0)),
+            'calendarSort' => $filters['calendar_sort'] ?? 'asc',
+            'calendarSchedules' => $calendarSchedules,
+            'calendarSuggestions' => $suggestions,
+            'sharedHolidays' => $holidays,
+            'ceremonyDepartments' => $departments,
+            'groupDepartments' => $groups,
+            'groupCount' => $groupCount,
+            'today' => $today->toDateString(),
         ]);
     }
 
@@ -68,70 +84,139 @@ class CeremonyScheduleController extends Controller
         $request->merge(['group_count' => $request->input('group_count', 4)]);
         $input = $request->validate([
             'year' => ['required', 'integer', 'between:2026,2030'],
-            'days' => ['required', 'array', 'size:52'],
-            'days.*.department_id' => ['nullable', 'integer', Rule::exists('departments', 'id')->where(fn ($query) => $query->whereIn('department_type', ['kecamatan', 'kelurahan'])->where('is_active', true))],
+            'calendar_month' => ['nullable', 'integer', 'between:0,12'],
+            'days' => ['sometimes', 'array'],
+            'days.*.department_id' => ['nullable', 'integer'],
             'days.*.group_number' => ['nullable', 'integer', 'between:1,255'],
             'group_count' => ['required', 'integer', 'between:2,255'],
             'group_departments' => ['required', 'array'],
             'group_departments.*' => ['required', 'integer', Rule::exists('departments', 'id')->where(fn ($query) => $query->whereIn('department_type', ['kecamatan', 'kelurahan'])->where('is_active', true))],
         ]);
-        $groupCount = (int) $input['group_count'];
-        $groupDepartments = array_filter($input['group_departments'], fn ($departmentId, $group) => (int) $group >= 1 && (int) $group <= $groupCount, ARRAY_FILTER_USE_BOTH);
-        if (count($groupDepartments) !== $groupCount || count(array_unique($groupDepartments)) !== $groupCount) {
+        $year = (int) $input['year'];
+        $groups = range(1, (int) $input['group_count']);
+        $groupDepartments = array_intersect_key(array_map('intval', $input['group_departments']), array_flip($groups));
+        if (count(array_unique($groupDepartments)) !== count($groups)) {
             throw ValidationException::withMessages(['group_departments' => 'Isi satu kecamatan atau kelurahan yang berbeda untuk setiap kelompok yang dipilih.']);
         }
-        $year = (int) $input['year'];
-        $expectedDates = array_column($this->mondayCalendar($year), 'date');
-        $sharedHolidayDates = DutyHoliday::query()->whereYear('holiday_date', $year)->pluck('holiday_date')->map(fn ($date) => CarbonImmutable::parse($date)->toDateString())->all();
-        if (array_diff(array_keys($input['days']), $expectedDates) !== [] || array_diff($expectedDates, array_keys($input['days'])) !== []) {
-            throw ValidationException::withMessages(['days' => 'Daftar tanggal Senin tidak lengkap. Muat ulang kalender sebelum menyimpan.']);
-        }
-        $today = now('Asia/Pontianak')->toDateString();
-        $pastDates = array_filter($expectedDates, fn ($date) => $date < $today);
-        foreach ($pastDates as $date) {
-            $existing = CeremonySchedule::query()->where('type', 'apel')->where('event_date', $date)->first();
-            $submitted = $input['days'][$date];
-            if ($existing && ((int) ($submitted['group_number'] ?? 0) !== (int) ($existing->ceremony_group_number ?? 0) || (int) ($submitted['department_id'] ?? 0) !== (int) ($existing->department_id ?? 0))) {
-                throw ValidationException::withMessages(["days.{$date}.group_number" => 'Jadwal apel yang sudah lewat tidak dapat diubah.']);
-            }
-        }
-        $groups = [];
-        foreach ($expectedDates as $date) {
-            $day = $input['days'][$date];
-            $isSharedHoliday = in_array($date, $sharedHolidayDates, true);
-            if (! $isSharedHoliday) {
-                $group = ! empty($day['department_id'])
-                    ? Department::query()->find($day['department_id'])?->ceremony_group_number
-                    : ($day['group_number'] ?? null);
-                $groups[$date] = $group ? (int) $group : null;
-            } else {
-                $groups[$date] = null;
-            }
+
+        $days = $this->mondayCalendar($year);
+        $selections = $input['days'] ?? [];
+        if (array_diff(array_keys($selections), array_column($days, 'date')) !== []) {
+            throw ValidationException::withMessages(['days' => 'Daftar tanggal Senin tidak valid. Muat ulang kalender sebelum menyimpan.']);
         }
 
-        DB::transaction(function () use ($input, $request, $groups, $sharedHolidayDates, $groupDepartments): void {
+        $today = now('Asia/Pontianak')->toDateString();
+        DB::transaction(function () use ($year, $days, $selections, $groups, $groupDepartments, $today, $request): void {
             Department::query()->whereIn('department_type', ['kecamatan', 'kelurahan'])->update(['ceremony_group_number' => null]);
             foreach ($groupDepartments as $group => $departmentId) {
                 Department::query()->whereKey($departmentId)->update(['ceremony_group_number' => $group]);
             }
-            foreach ($input['days'] as $date => $day) {
-                if ($groups[$date] === null && ! in_array($date, $sharedHolidayDates, true)) {
+
+            $schedules = $this->calendarSchedules($year);
+            $holidays = $this->calendarHolidays($year);
+            $suggestions = $this->calendarSuggestions($days, $schedules, $holidays, $groups, $today);
+
+            foreach ($days as ['date' => $date]) {
+                $schedule = $schedules->get($date);
+                if ($schedule && $date < $today) {
                     continue;
                 }
-                $schedule = CeremonySchedule::query()->firstOrNew(['type' => 'apel', 'event_date' => $date]);
+
+                if ($holidays->has($date)) {
+                    if (($schedule && $schedule->title !== 'Apel / Upacara')
+                        || ($date < $today && ! isset($selections[$date]))) {
+                        continue;
+                    }
+
+                    $schedule ??= new CeremonySchedule([
+                        'type' => 'apel', 'event_date' => $date,
+                        'title' => 'Apel / Upacara', 'created_by' => $request->user()->id,
+                    ]);
+                    $schedule->fill(['notes' => 'Libur', 'department_id' => null, 'ceremony_group_number' => null])->save();
+
+                    continue;
+                }
+
+                $selected = $selections[$date] ?? [];
+                $group = isset($selected['department_id'])
+                    ? array_search((int) $selected['department_id'], $groupDepartments, true)
+                    : ($selected['group_number'] ?? $suggestions[$date] ?? null);
+                if ($group === false || ($group !== null && ! isset($groupDepartments[$group]))) {
+                    throw ValidationException::withMessages(['days' => 'Pilih petugas dari urutan kelompok yang berlaku.']);
+                }
+
+                if ($group === null) {
+                    continue;
+                }
+
+                $schedule ??= new CeremonySchedule([
+                    'type' => 'apel', 'event_date' => $date,
+                    'title' => 'Apel / Upacara', 'created_by' => $request->user()->id,
+                ]);
+                if ($schedule->notes === 'Libur') {
+                    $schedule->notes = null;
+                }
                 $schedule->fill([
-                    'title' => 'Apel / Upacara',
-                    'department_id' => in_array($date, $sharedHolidayDates, true) ? null : $groupDepartments[$groups[$date]],
-                    'rotation_start_department_id' => null,
-                    'notes' => in_array($date, $sharedHolidayDates, true) ? 'Libur' : null,
-                    'ceremony_group_number' => $groups[$date],
-                    'created_by' => $schedule->exists ? $schedule->created_by : $request->user()->id,
+                    'department_id' => $groupDepartments[$group],
+                    'ceremony_group_number' => $group,
                 ])->save();
             }
         });
 
-        return to_route('ceremony-schedules.index', ['year' => $year, 'tab' => 'kalender'])
-            ->with('status', "Kalender apel tahun {$year} berhasil disimpan.");
+        return to_route('ceremony-schedules.index', [
+            'year' => $year,
+            'tab' => 'kalender',
+            'calendar_month' => $input['calendar_month'] ?? null,
+        ])->with('status', "Kalender apel tahun {$year} berhasil dipublikasikan.");
+    }
+
+    private function calendarSchedules(int $year): Collection
+    {
+        return CeremonySchedule::query()->where('type', 'apel')->whereYear('event_date', $year)
+            ->with('department')->orderBy('id')->get()
+            ->keyBy(fn (CeremonySchedule $schedule) => $schedule->event_date->toDateString());
+    }
+
+    private function calendarHolidays(int $year): Collection
+    {
+        return DutyHoliday::query()->whereYear('holiday_date', $year)->get()
+            ->keyBy(fn (DutyHoliday $holiday) => $holiday->holiday_date->toDateString());
+    }
+
+    private function calendarSuggestions(array $days, Collection $schedules, Collection $holidays, array $groups, string $today): array
+    {
+        $suggestions = [];
+        $next = null;
+        foreach ($days as ['date' => $date]) {
+            $schedule = $schedules->get($date);
+            if ($holidays->has($date) || $schedule?->notes === 'Libur bersama'
+                || ($date < $today && $schedule?->notes === 'Libur')) {
+                continue;
+            }
+
+            if ($schedule && $schedule->notes !== 'Libur') {
+                $index = array_search($schedule->ceremony_group_number, $groups, true);
+                if ($index !== false) {
+                    $next = ($index + 1) % count($groups);
+                    if ($date >= $today) {
+                        $suggestions[$date] = $groups[$index];
+                    }
+                    continue;
+                }
+
+                if ($date < $today || $schedule->ceremony_group_number === null) {
+                    continue;
+                }
+            }
+
+            if ($next !== null || $date >= $today) {
+                $next ??= 0;
+                $suggestions[$date] = $groups[$next];
+                $next = ($next + 1) % count($groups);
+            }
+        }
+
+        return $suggestions;
     }
 
     public function updateGroups(Request $request): JsonResponse
@@ -153,15 +238,6 @@ class CeremonyScheduleController extends Controller
             foreach ($groupDepartments as $group => $departmentId) {
                 Department::query()->whereKey($departmentId)->update(['ceremony_group_number' => $group]);
             }
-
-            CeremonySchedule::query()
-                ->where('type', 'apel')
-                ->where('event_date', '>=', now('Asia/Pontianak')->toDateString())
-                ->whereNotNull('ceremony_group_number')
-                ->get()
-                ->each(function (CeremonySchedule $schedule) use ($groupDepartments): void {
-                    $schedule->update(['department_id' => $groupDepartments[$schedule->ceremony_group_number] ?? null]);
-                });
         });
 
         return response()->json(['message' => 'Pengaturan kelompok berhasil disimpan.']);

@@ -19,7 +19,7 @@
     @if (request('tab') === 'kalender')
     <section class="card mt-7" aria-labelledby="calendar-heading">
         <h2 class="section-heading" id="calendar-heading">Kalender apel {{ $calendarYear }}</h2>
-        <p class="section-description mt-1">Daftar Senin tahun {{ $calendarYear }}. Status libur mengikuti menu Hari Libur; atur kelompok dan kelurahan petugas di kalender ini.</p>
+        <p class="section-description mt-1">Tinjau petugas setiap Senin. Setelah dipublikasikan, jadwal untuk semua bulan tersedia di kalender publik. Hari libur tidak mengambil giliran.</p>
         @if ($canManage)
         <form class="mt-5 flex flex-col gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-end sm:justify-between" method="GET" action="{{ route('ceremony-schedules.index') }}">
             <input type="hidden" name="tab" value="kalender">
@@ -31,25 +31,24 @@
                 <label class="sr-only" for="calendar_month_picker-trigger">Bulan dan tahun</label>
                 <x-month-picker id="calendar_month_picker" name="calendar_month_picker" value="{{ sprintf('%04d-%02d', $calendarYear, $calendarPickerMonth) }}" :years="$calendarYears" year-name="year" month-name="calendar_month" :auto-submit="true" />
             </div>
+            @if ($calendarMonth)
+                <a class="btn-secondary" href="{{ route('ceremony-schedules.index', ['year' => $calendarYear, 'tab' => 'kalender', 'calendar_month' => 0]) }}">Tinjau setahun</a>
+            @endif
             @if ($calendarPickerMonth < 12)
                 <a class="btn-secondary" href="{{ route('ceremony-schedules.index', ['year' => $calendarYear, 'tab' => 'kalender', 'calendar_month' => $calendarPickerMonth + 1]) }}">Bulan berikutnya</a>
             @endif
         </form>
-        <form id="ceremony-calendar-form" method="POST" action="{{ route('ceremony-schedules.calendar') }}" class="mt-5" data-ceremony-calendar>
+        <form id="ceremony-calendar-form" method="POST" action="{{ route('ceremony-schedules.calendar') }}" class="mt-5" data-ceremony-calendar
+            data-confirm-title="Publikasikan kalender apel?"
+            data-confirm-message="Jadwal apel {{ $calendarYear }} akan tampil di kalender publik."
+            data-confirm-button="Publikasikan">
             @csrf
             @method('PUT')
             <input type="hidden" name="year" value="{{ $calendarYear }}">
             @php($visibleCalendarDays = collect($calendarDays)->filter(fn ($day) => ! $calendarMonth || \Carbon\CarbonImmutable::parse($day['date'])->month === $calendarMonth)->sortBy(fn ($day) => $day['date'], SORT_REGULAR, $calendarSort === 'desc')->values())
-            @php($calendarSeedGroup = $visibleCalendarDays->isEmpty() ? 0 : ($calendarSchedules->filter(fn ($schedule) => $schedule->event_date->toDateString() < $visibleCalendarDays->first()['date'])->sortBy('event_date')->last()?->ceremony_group_number ?? 0))
-            <input type="hidden" data-ceremony-seed-group value="{{ $calendarSeedGroup }}">
-            @foreach ($calendarDays as $hiddenDay)
-                @if (! $visibleCalendarDays->contains(fn ($day) => $day['date'] === $hiddenDay['date']))
-                    @php($hiddenExisting = $calendarSchedules->get($hiddenDay['date']))
-                    <input type="hidden" name="days[{{ $hiddenDay['date'] }}][group_number]" value="{{ $hiddenExisting?->ceremony_group_number }}">
-                    <input type="hidden" name="days[{{ $hiddenDay['date'] }}][department_id]" value="{{ $hiddenExisting?->department_id }}">
-                @endif
-            @endforeach
+            <input type="hidden" name="calendar_month" value="{{ $calendarMonth }}">
             @error('days')<p class="form-error mb-3">{{ $message }}</p>@enderror
+            @error('group_departments')<p class="form-error mb-3">{{ $message }}</p>@enderror
             <dialog class="m-auto max-h-[calc(100dvh-2rem)] w-[min(100%-2rem,42rem)] overflow-y-auto rounded-2xl p-0 shadow-2xl backdrop:bg-slate-950/50" data-ceremony-groups-dialog data-save-url="{{ route('ceremony-schedules.groups') }}" aria-labelledby="ceremony-groups-title">
                 <div class="p-6">
                     <div class="flex items-start justify-between gap-4 border-b border-slate-100 pb-4"><div><h3 class="text-lg font-semibold text-slate-900" id="ceremony-groups-title">Urutan kelompok apel</h3><p class="mt-1 text-sm text-slate-600">Setiap kelurahan hanya boleh dipakai satu kelompok.</p></div><button class="btn-secondary px-3" type="button" data-ceremony-groups-close aria-label="Tutup">×</button></div>
@@ -79,16 +78,19 @@
                                 $dateKey = $date->toDateString();
                                 $inMonth = $date->month === $calendarMonth;
                                 $schedule = $calendarSchedules->get($dateKey);
-                                $holiday = $sharedHolidays->get($dateKey);
+                                $suggestedGroup = $calendarSuggestions[$dateKey] ?? null;
+                                $group = $suggestedGroup ?? $schedule?->ceremony_group_number;
+                                $department = $suggestedGroup ? $groupDepartments->get($suggestedGroup) : $schedule?->department;
+                                $isHoliday = $sharedHolidays->has($dateKey) || ($suggestedGroup === null && in_array($schedule?->notes, \App\Models\CeremonySchedule::HOLIDAY_NOTES, true));
                             ?>
                             <div class="min-h-24 border-b border-r border-slate-200 p-2 {{ $inMonth ? 'bg-white' : 'bg-slate-50 text-slate-400' }}" data-calendar-date="{{ $dateKey }}">
                                 <p class="text-xs font-semibold">{{ $date->day }}</p>
                                 <?php if ($inMonth && $date->isMonday()): ?>
-                                    <?php if ($holiday || $schedule?->notes === 'Libur'): ?>
+                                    <?php if ($isHoliday): ?>
                                         <p class="mt-2 text-xs font-medium text-rose-600">Libur</p>
-                                    <?php elseif ($schedule?->ceremony_group_number): ?>
-                                        <p class="mt-2 text-xs font-semibold text-sky-700" data-calendar-group>Kelompok {{ $schedule->ceremony_group_number }}</p>
-                                        <p class="mt-1 line-clamp-2 text-xs text-slate-600" data-calendar-department>{{ $schedule->department?->name ?? 'Belum dipilih' }}</p>
+                                    <?php elseif ($group || $department): ?>
+                                        <p class="mt-2 text-xs font-semibold text-sky-700" data-calendar-group>{{ $group ? 'Kelompok '.$group : '' }}</p>
+                                        <p class="mt-1 line-clamp-2 text-xs text-slate-600" data-calendar-department>{{ $department?->name ?? 'Belum dipilih' }}</p>
                                     <?php else: ?>
                                         <p class="mt-2 text-xs font-semibold text-sky-700" data-calendar-group></p>
                                         <p class="mt-1 line-clamp-2 text-xs text-slate-600" data-calendar-department>Belum dipilih</p>
@@ -100,7 +102,6 @@
                 </div>
             <?php endif; ?>
             <div class="overflow-x-auto">
-                @php($assignedCeremonyDepartments = $ceremonyDepartments->whereNotNull('ceremony_group_number')->sortBy(['ceremony_group_number', 'name'])->values())
                 <table class="min-w-full border-collapse text-left text-sm">
                     <thead class="bg-emerald-50 text-slate-800"><tr class="border border-slate-300"><th class="whitespace-nowrap border border-slate-300 px-3 py-2 font-semibold">Tanggal</th><th class="border border-slate-300 px-3 py-2 font-semibold">Kelompok / Petugas</th></tr></thead>
                     <tbody>
@@ -108,18 +109,42 @@
                         <tr><td colspan="2" class="border border-slate-300 px-3 py-8 text-center text-slate-500">Tidak ada jadwal Senin pada bulan yang dipilih.</td></tr>
                     @endif
                     @foreach ($visibleCalendarDays as $day)
-                        @php($existing = $calendarSchedules->get($day['date']))
-                        @php($isHoliday = $existing?->notes === 'Libur' || $sharedHolidays->has($day['date']))
-                        @php($isPast = $day['date'] < now('Asia/Pontianak')->toDateString())
+                        <?php
+                            $existing = $calendarSchedules->get($day['date']);
+                            $suggestedGroup = $calendarSuggestions[$day['date']] ?? null;
+                            $group = $suggestedGroup ?? $existing?->ceremony_group_number;
+                            $department = $suggestedGroup ? $groupDepartments->get($suggestedGroup) : $existing?->department;
+                            $isHoliday = $sharedHolidays->has($day['date']) || ($suggestedGroup === null && in_array($existing?->notes, \App\Models\CeremonySchedule::HOLIDAY_NOTES, true));
+                            $locked = $day['date'] < $today && ($existing || $suggestedGroup === null);
+                        ?>
                         <tr class="border border-slate-300 even:bg-slate-50">
                             <td class="whitespace-nowrap border border-slate-300 px-3 py-1.5 font-medium text-slate-800">{{ \Carbon\CarbonImmutable::parse($day['date'])->format('d/m/Y') }}</td>
-                            <td class="border border-slate-300 px-3 py-1.5"><div class="grid gap-2"><span class="text-xs font-semibold text-slate-500" data-ceremony-group-display>{{ $existing?->ceremony_group_number ? 'Kelompok '.$existing->ceremony_group_number : 'Belum dipilih' }}</span><input type="hidden" name="days[{{ $day['date'] }}][group_number]" value="{{ $existing?->ceremony_group_number }}">@if ($isHoliday || $isPast)<input type="hidden" name="days[{{ $day['date'] }}][department_id]" value="{{ $existing?->department_id }}">@endif<select class="form-select min-w-52" name="days[{{ $day['date'] }}][department_id]" data-ceremony-department aria-label="Petugas {{ $day['label'] }}" @disabled($isHoliday || $isPast)><option value="">Pilih kelompok / petugas</option>@foreach ($assignedCeremonyDepartments as $department)<option value="{{ $department->id }}" data-group="{{ $department->ceremony_group_number }}" @selected((string) $existing?->department_id === (string) $department->id)>Kelompok {{ $department->ceremony_group_number }} — {{ ucfirst($department->department_type) }} — {{ $department->name }}</option>@endforeach</select></div></td>
+                            <td class="border border-slate-300 px-3 py-1.5">
+                                <div class="grid gap-2">
+                                    <span class="text-xs font-semibold text-slate-500" data-ceremony-group-display>{{ $isHoliday ? 'Libur' : ($group ? 'Kelompok '.$group : ($department?->name ?? 'Belum dipilih')) }}</span>
+                                    @if ($isHoliday || $locked)
+                                        @if (! $isHoliday && $group && $department)
+                                            <span class="text-sm text-slate-600">{{ $department->name }}</span>
+                                        @endif
+                                    @else
+                                        <select class="form-select min-w-52" name="days[{{ $day['date'] }}][department_id]" data-ceremony-department aria-label="Petugas {{ $day['label'] }}">
+                                            <option value="">Pilih kelompok / petugas</option>
+                                            @foreach ($groupDepartments as $groupNumber => $unit)
+                                                <option value="{{ $unit->id }}" data-group="{{ $groupNumber }}" data-department-name="{{ $unit->name }}" @selected($department?->id === $unit->id)>Kelompok {{ $groupNumber }} — {{ $unit->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    @endif
+                                </div>
+                            </td>
                         </tr>
                     @endforeach
                     </tbody>
                 </table>
             </div>
-            <button class="btn-primary mt-5" type="submit">Simpan kalender {{ $calendarYear }}</button>
+            @if ($groupDepartments->count() !== $groupCount)
+                <p class="form-help mt-5">Lengkapi urutan kelompok sebelum memublikasikan jadwal.</p>
+            @endif
+            <button class="btn-primary mt-5" type="submit" @disabled($groupDepartments->count() !== $groupCount)>Simpan dan publikasikan {{ $calendarYear }}</button>
         </form>
         @endif
     </section>

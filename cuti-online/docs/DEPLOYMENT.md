@@ -64,7 +64,7 @@ docker compose --env-file .env.production -f compose.yaml -f compose.production.
 docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml ps
 ```
 
-Layanan `init` akan menjalankan migrasi database dan menyalin aset hasil build. Jangan menjalankan `migrate:fresh` pada VPS karena perintah tersebut menghapus data.
+Layanan `init` menjalankan migrasi database, menambahkan jenis cuti bawaan yang belum ada, dan menyalin aset hasil build. Jangan menjalankan `migrate:fresh` pada VPS karena perintah tersebut menghapus data.
 
 Buat akun administrator pertama:
 

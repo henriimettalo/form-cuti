@@ -30,10 +30,7 @@ class AuthController extends Controller
 
         /** @var User|null $user */
         $user = Auth::user();
-        $isLegacyOperator = $user instanceof User
-            && strtolower(trim((string) $user->role)) === 'operator';
-
-        if ($user instanceof User && ! $user->isSuperAdmin() && ! $isLegacyOperator && ! $user->department?->is_active) {
+        if ($user instanceof User && ! $user->isSuperAdmin() && ! $user->department?->is_active) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();

@@ -59,7 +59,7 @@ class ScheduleController extends Controller
         $label = $date->isSameDay(CarbonImmutable::today('Asia/Pontianak')) ? 'Hari Ini' : $date->locale('id')->translatedFormat('j F Y');
         $data = CeremonySchedule::query()->with('department')->whereIn('type', ['apel', 'upacara'])
             ->where('event_date', $date->toDateString())
-            ->where(fn ($query) => $query->whereNull('notes')->orWhere('notes', '!=', 'Libur bersama'))
+            ->withoutHolidayPlaceholders()
             ->orderBy('start_time')->orderBy('id')->get()
             ->map(function (CeremonySchedule $schedule) use ($label): array {
                 $department = $schedule->department?->name ?? 'Belum ditentukan';
@@ -145,6 +145,7 @@ class ScheduleController extends Controller
         $schedules = CeremonySchedule::query()
             ->with(['department', 'dutyGroup'])
             ->whereIn('type', $types)
+            ->when(in_array('apel', $types, true), fn ($query) => $query->withoutHolidayPlaceholders())
             ->when($data['month'] ?? null, function ($query, string $month): void {
                 $period = CarbonImmutable::createFromFormat('!Y-m', $month, 'Asia/Pontianak');
                 $query->whereBetween('event_date', [$period->toDateString(), $period->endOfMonth()->toDateString()]);

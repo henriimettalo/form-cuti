@@ -4,6 +4,7 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>@yield('title', 'SIMPEG') · Sistem Kepegawaian</title>
+        <x-favicon />
         <script>
             if (window.frameElement?.hasAttribute('data-workspace-frame')) {
                 document.documentElement.dataset.workspaceFrame = 'true';

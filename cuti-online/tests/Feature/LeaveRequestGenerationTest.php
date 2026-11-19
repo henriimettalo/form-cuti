@@ -89,7 +89,7 @@ class LeaveRequestGenerationTest extends TestCase
             ->assertDontSee("value=\"{$annualLeave->id}\" data-code=\"annual\" selected", false);
     }
 
-    public function test_operator_can_create_a_leave_request_and_downloadable_docx(): void
+    public function test_operator_can_retry_a_saved_leave_request_and_download_the_docx(): void
     {
         Storage::fake('local');
 
@@ -165,15 +165,31 @@ class LeaveRequestGenerationTest extends TestCase
             'official_position_title' => 'Jabatan Tidak Sah',
         ];
 
+        Storage::disk('local')->put('leave-documents', 'Simulates an unavailable output directory');
         $response = $this->actingAs($operator)->post(route('leave-requests.store'), $payload);
 
         $leaveRequest = LeaveRequest::query()->firstOrFail();
+        $response->assertRedirect(route('leave-requests.show', $leaveRequest))
+            ->assertSessionHasErrors('document');
+        $this->assertSame('draft', $leaveRequest->status);
+        $this->assertDatabaseCount('generated_documents', 0);
+        $this->get(route('leave-requests.show', $leaveRequest))
+            ->assertOk()
+            ->assertSee('Coba buat dokumen lagi');
+
+        Storage::disk('local')->delete('leave-documents');
+        $this->post(route('leave-requests.documents.generate', $leaveRequest))
+            ->assertRedirect(route('leave-requests.show', $leaveRequest))
+            ->assertSessionHasNoErrors();
+
+        $leaveRequest->refresh();
         $document = GeneratedDocument::query()->firstOrFail();
 
         $this->actingAs($operator)->post(route('leave-requests.store'), $payload)
             ->assertRedirect(route('leave-requests.show', $leaveRequest));
 
-        $response->assertRedirect(route('leave-requests.show', $leaveRequest));
+        $this->post(route('leave-requests.documents.generate', $leaveRequest))
+            ->assertRedirect(route('leave-requests.show', $leaveRequest));
         $this->assertSame('generated', $leaveRequest->status);
         $this->assertSame(auth()->id(), $leaveRequest->created_by);
         $this->assertSame(1, LeaveRequest::query()->count());

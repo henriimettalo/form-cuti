@@ -32,7 +32,7 @@ services:
           storage/framework/views \
           storage/logs
         chown -R www-data:www-data storage
-        php artisan migrate --force
+        php artisan migrate --seed --seeder=LeaveTypeSeeder --force
         cp -a public/. /shared-public/
 
   app:

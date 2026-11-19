@@ -1,13 +1,13 @@
 # SIMPEG Cuti Online — Sistem Kepegawaian & Cuti Kecamatan
 
-Aplikasi web pengelolaan data pegawai, pengajuan cuti, dan payroll untuk lingkungan pemerintahan kecamatan. Dibangun dengan Laravel + SQLite.
+Aplikasi Laravel untuk pengelolaan data pegawai, pengajuan cuti, dan jadwal kegiatan kecamatan. Mendukung SQLite dan PostgreSQL.
 
 ## Fitur
 
 - **Master Pegawai** — kelola identitas pegawai (NIP, nama, jabatan, kontak), import identitas dari Excel (NIP+nama saja), arsip/pulihkan, bulk archive.
 - **Cuti** — buat formulir cuti tahunan, hitung durasi otomatis, snapshot data pegawai + pejabat penandatangan, generate dokumen Word (.docx) dari template.
 - **Pejabat berwenang** — kelola pejabat penandatangan: Pejabat Berwenang, Sekda, Wali Kota. Khusus pemohon Camat, atasan & pejabat berwenang otomatis diisi; dukungan PLH.
-- **Payroll** — import gaji utama (Gaji PNS) + pelengkap TPP dari Excel, per periode bulanan. Update data master pegawai dari file, rekonsiliasi total, ekspor/slip.
+- **Payroll** — impor file Gaji PNS atau TPP SIPD untuk memperbarui data pegawai yang sudah terdaftar, termasuk nomor rekening. Impor ini mengabaikan nominal gaji, tunjangan, potongan, dan transfer. Ekspor dan slip tersedia untuk periode payroll yang sudah tersimpan.
 - **Template dokumen** — unggah template Word formulir cuti.
 - **Profil instansi** — nama instansi dipakai pada formulir.
 - **Jadwal Kegiatan** — agenda bulanan untuk Apel / Upacara (satu jenis kegiatan) dan Piket Loket, dengan nama kegiatan, tanggal, unit petugas, dan catatan. Waktu mulai, lokasi, dan pembina tidak perlu diisi; data lama tetap tersimpan tanpa ditampilkan. Jadwal apel serta upacara lama tetap tampil dalam filter gabungan. Semua pengguna dapat melihat; Super Admin dapat menambah, mengedit, dan menghapus jadwal.
@@ -17,9 +17,9 @@ Aplikasi web pengelolaan data pegawai, pengajuan cuti, dan payroll untuk lingkun
 
 ## Persyaratan
 
-- PHP 8.2+
+- PHP 8.4.1 atau lebih baru
 - Composer
-- Node.js 18+ (untuk build aset Vite)
+- Node.js 22.12 atau lebih baru (untuk Vite dan Concurrently)
 - SQLite (default) atau PostgreSQL
 
 ## Instalasi
@@ -38,15 +38,17 @@ php artisan key:generate
 # 4. Konfigurasi .env (sesuaikan nama instansi, DB, dsb.)
 #    APP_NAME=NamaInstansi
 
-# 5. Migrasi + seed data awal (jenis cuti)
-php artisan migrate
-php artisan db:seed
+# 5. Siapkan file database jika memakai SQLite bawaan
+touch database/database.sqlite
 
-# 6. Build aset frontend
+# 6. Migrasi dan isi jenis cuti bawaan
+php artisan migrate --seed
+
+# 7. Build aset frontend
 npm run build
 # atau saat pengembangan: npm run dev
 
-# 7. Jalankan server
+# 8. Jalankan server
 php artisan serve
 ```
 
@@ -54,28 +56,20 @@ Buka `http://127.0.0.1:8000`.
 
 ## Membuat akun admin
 
-Tidak ada seeder akun. Buat pengguna lewat `php artisan tinker`:
+Jalankan perintah berikut dan masukkan kata sandi saat diminta.
 
-```php
-php artisan tinker
-
-App\Models\User::create([
-    'name' => 'Admin',
-    'email' => 'admin@example.go.id',
-    'password' => bcrypt('password'),
-    'role' => 'admin',
-]);
+```bash
+php artisan app:create-admin "Nama Admin" admin@example.go.id
 ```
 
-Role yang diakui untuk akses data sensitif & bulk delete: `admin`, `administrator`, `pejabat`, `simpeg_admin`.
+Super Admin mengelola data sensitif dan pengaturan sistem. Admin Unit dan Pengguna memerlukan unit kerja aktif.
 
 ## Alur kerja umum
 
 1. **Isi Profil Instansi** (`/profil-instansi`) — nama instansi.
 2. **Tambah pegawai** — input NIP + nama + jabatan (+ kontak). Detail lain dikosongkan.
-3. **Lengkapi data pegawai** — lewat menu **Payroll → Impor** (unggah file Gaji PNS; data master ikut terisi). File TPP sebagai pelengkap.
+3. **Lengkapi data pegawai** — buka **Payroll → Impor**, pilih periode dan jenis file (Gaji PNS atau TPP SIPD), periksa perubahan di pratinjau, lalu konfirmasi.
 4. **Buat formulir cuti** (`/formulir-cuti`) — pilih pegawai, tanggal, durasi; atasan & pejabat berwenang otomatis. Cetak dokumen Word.
-5. **Import payroll per bulan** — `Payroll → Impor`, pilih bulan, jenis file (Gaji utama / TPP), periksa pratinjau, konfirmasi.
 
 ## Menjalankan test
 

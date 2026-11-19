@@ -249,6 +249,7 @@ class CeremonyScheduleTest extends TestCase
 
     public function test_group_configuration_is_saved_without_submitting_the_calendar(): void
     {
+        $this->travelTo(Carbon::parse('2026-11-19 10:00', 'Asia/Pontianak'));
         $firstDepartment = Department::query()->create(['name' => 'Kelurahan A', 'department_type' => 'kelurahan', 'is_active' => true]);
         $secondDepartment = Department::query()->create(['name' => 'Kelurahan B', 'department_type' => 'kelurahan', 'is_active' => true]);
         CeremonySchedule::query()->create($this->scheduleData([
@@ -267,11 +268,71 @@ class CeremonyScheduleTest extends TestCase
 
         $this->assertDatabaseHas('departments', ['id' => $secondDepartment->id, 'ceremony_group_number' => 1]);
         $this->assertDatabaseHas('departments', ['id' => $firstDepartment->id, 'ceremony_group_number' => 2]);
-        $this->assertDatabaseHas('ceremony_schedules', ['event_date' => '2026-12-07', 'department_id' => $secondDepartment->id, 'ceremony_group_number' => 1]);
+        $this->assertDatabaseHas('ceremony_schedules', ['event_date' => '2026-12-07', 'department_id' => $firstDepartment->id, 'ceremony_group_number' => 1]);
         $this->get(route('ceremony-schedules.index', ['year' => 2026, 'tab' => 'kalender']))
             ->assertOk()
             ->assertViewHas('groupCount', 2)
             ->assertSee('Kelurahan B');
+
+        $this->put(route('ceremony-schedules.calendar'), [
+            'year' => 2026,
+            'group_count' => 2,
+            'group_departments' => [1 => $secondDepartment->id, 2 => $firstDepartment->id],
+        ])->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('ceremony_schedules', ['event_date' => '2026-12-07', 'department_id' => $secondDepartment->id, 'ceremony_group_number' => 1]);
+    }
+
+    public function test_calendar_previews_and_publishes_the_rotation_across_months_in_one_save(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-19 10:00', 'Asia/Pontianak'));
+        $departments = [];
+        foreach (range(1, 6) as $group) {
+            $departments[$group] = Department::query()->create([
+                'name' => "Unit Uji {$group}",
+                'department_type' => 'kelurahan',
+                'is_active' => true,
+                'ceremony_group_number' => $group,
+            ])->id;
+        }
+        $anchor = CeremonySchedule::query()->create($this->scheduleData([
+            'type' => 'apel',
+            'event_date' => '2026-10-26',
+            'department_id' => $departments[5],
+            'ceremony_group_number' => 5,
+            'notes' => 'Catatan jadwal Oktober',
+        ]));
+        DutyHoliday::query()->create(['holiday_date' => '2026-12-07', 'name' => 'Libur Uji']);
+        $publicNovember = route('public-schedules.index', ['tab' => 'apel', 'month' => '2026-11']);
+        $this->get($publicNovember)->assertSee('Belum ada jadwal pada bulan ini.');
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('ceremony-schedules.index', ['year' => 2026, 'tab' => 'kalender', 'calendar_month' => 11]))
+            ->assertOk()
+            ->assertSee('Simpan dan publikasikan 2026')
+            ->assertViewHas('calendarSuggestions', fn ($plan) => array_intersect_key($plan, array_flip([
+                '2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23', '2026-11-30', '2026-12-07', '2026-12-14',
+            ])) === [
+                '2026-11-02' => 6, '2026-11-09' => 1, '2026-11-16' => 2, '2026-11-23' => 3, '2026-11-30' => 4, '2026-12-14' => 5,
+            ]);
+        $this->assertDatabaseCount('ceremony_schedules', 1);
+
+        $form = [
+            'year' => 2026,
+            'calendar_month' => 11,
+            'group_count' => 6,
+            'group_departments' => $departments,
+            'days' => ['2026-11-23' => ['department_id' => $departments[4]]],
+        ];
+        $this->put(route('ceremony-schedules.calendar'), $form)->assertSessionHasNoErrors();
+        $this->put(route('ceremony-schedules.calendar'), $form)->assertSessionHasNoErrors();
+
+        $this->assertSame('Catatan jadwal Oktober', $anchor->fresh()->notes);
+        $this->assertDatabaseMissing('ceremony_schedules', ['event_date' => '2026-10-19', 'type' => 'apel']);
+        $this->assertDatabaseCount('ceremony_schedules', 10);
+        $this->get($publicNovember)->assertSee('Unit Uji 6')->assertSee('Unit Uji 4')->assertDontSee('Unit Uji 3');
+        $this->get(route('public-schedules.index', ['tab' => 'apel', 'month' => '2026-12']))
+            ->assertSee('Unit Uji 5')->assertDontSee('07/12');
     }
 
     public function test_selected_department_recalculates_group_instead_of_using_stale_hidden_group(): void

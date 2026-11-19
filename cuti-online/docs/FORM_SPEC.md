@@ -68,7 +68,7 @@ Validasi awal:
 - Pegawai harus aktif.
 - Tanggal cuti tidak boleh tumpang tindih dengan formulir aktif pegawai yang sama.
 - Lama cuti tahunan tidak boleh melebihi saldo yang tersedia.
-- Hari libur pada tabel `holidays` tidak dihitung sebagai hari kerja.
+- Perhitungan hari kerja cuti tahunan mengecualikan akhir pekan, tanggal pada kalender Hari Libur, dan hari libur yang tersimpan dari versi lama.
 
 ### 5. Blok tanda tangan
 

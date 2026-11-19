@@ -48,26 +48,22 @@ class PublicScheduleController extends Controller
 
         $scheduleRecords = CeremonySchedule::query()
             ->with(['department', 'dutyGroup'])
-            ->where('type', $tab === 'apel' ? 'apel' : 'piket_loket')
+            ->whereIn('type', $tab === 'apel' ? ['apel', 'upacara'] : ['piket_loket'])
             ->when($tab === 'piket', fn ($query) => $query->whereNull('department_id'))
             ->where('event_date', '>=', $month->toDateString())
-            ->where('event_date', '<=', $month->endOfMonth()->toDateString())
-            ->where(function ($query): void {
-                $query->whereNull('notes')->orWhere('notes', '!=', 'Libur bersama');
-            })
+            ->where('event_date', '<', $month->addMonth()->toDateString())
+            ->withoutHolidayPlaceholders()
             ->orderBy('event_date')
             ->orderBy('id')
-            ->get();
-        $schedules = $tab === 'piket'
-            ? $scheduleRecords->groupBy(fn (CeremonySchedule $schedule) => $schedule->event_date->toDateString())
-            : $scheduleRecords->keyBy(fn (CeremonySchedule $schedule) => $schedule->event_date->toDateString());
+            ->get()
+            ->groupBy(fn (CeremonySchedule $schedule) => $schedule->event_date->toDateString());
 
         $kelurahans = collect();
 
         return view('public-schedules.index', [
             'month' => $month,
             'tab' => $tab,
-            'schedules' => $schedules,
+            'schedules' => $scheduleRecords,
             'kelurahans' => $kelurahans,
             'calendarWeeks' => $this->calendarWeeks($month),
             'years' => range(2026, 2030),

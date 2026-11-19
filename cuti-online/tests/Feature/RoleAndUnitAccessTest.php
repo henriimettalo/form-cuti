@@ -440,6 +440,9 @@ class RoleAndUnitAccessTest extends TestCase
             ->get(route('leave-requests.show', $otherRequest))
             ->assertNotFound();
 
+        $this->post(route('leave-requests.documents.generate', $otherRequest))
+            ->assertNotFound();
+
         Official::query()->create([
             'signature_role' => 'authorized_official',
             'full_name' => 'Pejabat Berwenang',

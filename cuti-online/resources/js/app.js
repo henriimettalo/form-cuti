@@ -196,22 +196,41 @@ document.querySelectorAll('[data-month-picker]').forEach((picker) => {
         if (splitMonthInput) splitMonthInput.value = Number(month);
         picker.dataset.monthValue = value;
         label.textContent = `${monthNames[Number(month) - 1]} ${year}`;
-        monthButtons.forEach((button) => button.setAttribute('aria-selected', String(button.dataset.monthPickerMonth === month)));
+        monthButtons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.monthPickerMonth === month)));
     };
-    const closePicker = () => {
+    const closePicker = (restoreFocus = false) => {
+        if (restoreFocus) trigger.focus();
         popover.hidden = true;
         trigger.setAttribute('aria-expanded', 'false');
     };
     trigger.addEventListener('click', () => {
         popover.hidden = !popover.hidden;
         trigger.setAttribute('aria-expanded', String(!popover.hidden));
+        if (!popover.hidden) popover.querySelector('[aria-pressed="true"]')?.focus();
+    });
+    picker.addEventListener('keydown', (event) => {
+        if (popover.hidden) return;
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            closePicker(true);
+            return;
+        }
+        const index = monthButtons.indexOf(event.target);
+        const offsets = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -3, ArrowDown: 3 };
+        if (index === -1 || !(event.key in offsets)) return;
+        event.preventDefault();
+        monthButtons[Math.max(0, Math.min(monthButtons.length - 1, index + offsets[event.key]))]?.focus();
+    });
+    picker.addEventListener('focusout', (event) => {
+        if (event.relatedTarget && !picker.contains(event.relatedTarget)) closePicker();
     });
     const submitAfterUpdate = () => {
         if (picker.dataset.monthPickerAutoSubmit === 'true') picker.closest('form')?.submit();
     };
     monthButtons.forEach((button) => button.addEventListener('click', () => {
         updatePicker(button.dataset.monthPickerMonth);
-        closePicker();
+        closePicker(true);
         submitAfterUpdate();
     }));
     yearSelect.addEventListener('change', () => {
@@ -224,136 +243,20 @@ document.querySelectorAll('[data-month-picker]').forEach((picker) => {
     updatePicker(picker.dataset.monthValue.split('-')[1]);
 });
 
-const ceremonyCalendarYear = document.querySelector('[data-ceremony-calendar] input[name="year"]')?.value ?? '2026';
-const ceremonyCalendarStorageKey = `ceremony-calendar-${ceremonyCalendarYear}-assignments`;
-let ceremonyCalendarAssignments = {};
-try {
-    ceremonyCalendarAssignments = JSON.parse(localStorage.getItem(ceremonyCalendarStorageKey) ?? '{}');
-} catch (error) {
-    ceremonyCalendarAssignments = {};
-}
-
-const ceremonyCalendarDate = (select) => select.name.match(/^days\[([^\]]+)\]/)?.[1];
-const saveCeremonyCalendarAssignment = (select) => {
-    const date = ceremonyCalendarDate(select);
-    if (!date) return;
-    if (select.value) ceremonyCalendarAssignments[date] = select.value;
-    else delete ceremonyCalendarAssignments[date];
-    localStorage.setItem(ceremonyCalendarStorageKey, JSON.stringify(ceremonyCalendarAssignments));
-};
-
 document.querySelectorAll('[data-ceremony-department]').forEach((select) => {
-    const display = select.closest('[data-ceremony-department]')?.parentElement?.querySelector('[data-ceremony-group-display]');
-    if (!display) return;
-    const syncCalendarCell = () => {
+    select.addEventListener('change', () => {
+        const option = select.selectedOptions[0];
+        const group = option?.dataset.group;
         const date = select.name.match(/^days\[([^\]]+)\]/)?.[1];
-        const cell = Array.from(document.querySelectorAll('[data-calendar-date]')).find((candidate) => candidate.dataset.calendarDate === date);
-        if (!cell) return;
-        const group = select.selectedOptions[0]?.dataset.group;
-        const label = select.selectedOptions[0]?.textContent?.split(' — ').slice(2).join(' — ').trim();
-        const calendarGroup = cell.querySelector('[data-calendar-group]');
-        const calendarDepartment = cell.querySelector('[data-calendar-department]');
+        const cell = document.querySelector(`[data-calendar-date="${date}"]`);
+        const display = select.parentElement.querySelector('[data-ceremony-group-display]');
+        const calendarGroup = cell?.querySelector('[data-calendar-group]');
+        const calendarDepartment = cell?.querySelector('[data-calendar-department]');
+
+        if (display) display.textContent = group ? `Kelompok ${group}` : 'Belum dipilih';
         if (calendarGroup) calendarGroup.textContent = group ? `Kelompok ${group}` : '';
-        if (calendarDepartment) calendarDepartment.textContent = label || 'Belum dipilih';
-    };
-    const updateGroupDisplay = () => {
-        const group = select.selectedOptions[0]?.dataset.group;
-        display.textContent = group ? `Kelompok ${group}` : 'Belum dipilih';
-        syncCalendarCell();
-        saveCeremonyCalendarAssignment(select);
-    };
-    select.addEventListener('change', updateGroupDisplay);
-    updateGroupDisplay();
-});
-
-document.querySelectorAll('[data-ceremony-calendar] tbody').forEach((tbody) => {
-    const rows = Array.from(tbody.querySelectorAll('tr'));
-    const editableSelects = rows.map((row) => row.querySelector('[data-ceremony-department]')).filter((select) => select && !select.disabled);
-    const groups = [...new Set(Array.from(editableSelects[0]?.options ?? []).map((option) => Number(option.dataset.group)).filter(Boolean))].sort((left, right) => left - right);
-    if (!editableSelects.length || !groups.length) return;
-
-    const assignGroup = (select, group) => {
-        const option = Array.from(select.options).find((candidate) => Number(candidate.dataset.group) === group);
-        if (!option || select.value === option.value) return;
-        select.value = option.value;
-        const autoAssignedEvent = new Event('change', { bubbles: true });
-        autoAssignedEvent.autoAssigned = true;
-        select.dispatchEvent(autoAssignedEvent);
-    };
-
-    const resequenceFrom = (anchorSelect, selectedGroup) => {
-        const anchorIndex = editableSelects.indexOf(anchorSelect);
-        const selectedIndex = groups.indexOf(selectedGroup);
-        if (anchorIndex < 0 || selectedIndex < 0) return;
-
-        for (let index = anchorIndex - 1; index >= 0; index -= 1) {
-            const groupIndex = (selectedIndex - (anchorIndex - index) + groups.length * 2) % groups.length;
-            assignGroup(editableSelects[index], groups[groupIndex]);
-        }
-        for (let index = anchorIndex + 1; index < editableSelects.length; index += 1) {
-            const groupIndex = (selectedIndex + (index - anchorIndex)) % groups.length;
-            assignGroup(editableSelects[index], groups[groupIndex]);
-        }
-    };
-
-    editableSelects.forEach((select) => {
-        select.addEventListener('change', (event) => {
-            if (event.autoAssigned) return;
-            const selectedGroup = Number(select.selectedOptions[0]?.dataset.group ?? 0);
-            if (selectedGroup) resequenceFrom(select, selectedGroup);
-        });
+        if (calendarDepartment) calendarDepartment.textContent = option?.dataset.departmentName ?? 'Belum dipilih';
     });
-});
-
-document.querySelectorAll('[data-ceremony-calendar]').forEach((calendar) => {
-    const selects = Array.from(calendar.querySelectorAll('[data-ceremony-department]'));
-    const serverSeedGroup = Number(calendar.querySelector('[data-ceremony-seed-group]')?.value ?? 0);
-    const editableSelects = selects.filter((select) => !select.disabled);
-    editableSelects.forEach((select) => {
-        const storedValue = ceremonyCalendarAssignments[ceremonyCalendarDate(select)];
-        const storedOption = Array.from(select.options).find((option) => option.value === storedValue);
-        if (!select.value && storedOption) {
-            select.value = storedOption.value;
-            const restoredEvent = new Event('change', { bubbles: true });
-            restoredEvent.autoAssigned = true;
-            select.dispatchEvent(restoredEvent);
-        }
-    });
-    if (!editableSelects.length || editableSelects.some((select) => select.value)) return;
-    const groups = [...new Set(Array.from(editableSelects[0].options).map((option) => Number(option.dataset.group)).filter(Boolean))].sort((left, right) => left - right);
-    if (!groups.length) return;
-    const firstDate = ceremonyCalendarDate(editableSelects[0]);
-    const previousDates = Object.keys(ceremonyCalendarAssignments).filter((date) => date < firstDate).sort();
-    const previousValue = previousDates.length ? ceremonyCalendarAssignments[previousDates.at(-1)] : null;
-    const previousOption = Array.from(editableSelects[0].options).find((option) => option.value === previousValue);
-    const seedGroup = Number(previousOption?.dataset.group ?? serverSeedGroup);
-    const seedIndex = groups.indexOf(seedGroup);
-    const firstGroup = groups[(seedIndex + 1) % groups.length];
-    const firstOption = Array.from(editableSelects[0].options).find((option) => Number(option.dataset.group) === firstGroup);
-    if (!firstOption) return;
-    editableSelects[0].value = firstOption.value;
-    editableSelects[0].dispatchEvent(new Event('change', { bubbles: true }));
-});
-
-document.querySelectorAll('[data-ceremony-calendar] tbody tr').forEach((row) => {
-    const isMasuk = row.querySelector('[name$="[is_masuk]"]');
-    const isLibur = row.querySelector('[name$="[is_libur]"]');
-    const department = row.querySelector('[name$="[department_id]"]');
-    const summary = row.querySelector('[data-summary]');
-    const group = row.querySelector('[data-group]');
-    if (!isMasuk || !isLibur || !department || !summary || !group) return;
-    const updateRow = (source) => {
-        const holiday = source === isLibur ? source.value === '1' : source === isMasuk ? source.value === '0' : isLibur.value === '1';
-        isMasuk.value = holiday ? '0' : '1';
-        isLibur.value = holiday ? '1' : '0';
-        summary.textContent = holiday ? 'Libur' : department.value ? 'Masuk' : '';
-        department.disabled = holiday;
-        group.textContent = holiday ? '' : group.value;
-    };
-    isMasuk.addEventListener('change', () => updateRow(isMasuk));
-    isLibur.addEventListener('change', () => updateRow(isLibur));
-    department.addEventListener('change', () => updateRow(department));
-    updateRow(isLibur);
 });
 
 const ceremonyGroupsDialog = document.querySelector('[data-ceremony-groups-dialog]');

@@ -4,6 +4,25 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title', 'Jadwal Publik') · SIMPEG</title>
+    <x-favicon />
+    @hasSection('description')
+        <meta name="description" content="@yield('description')">
+    @endif
+    @hasSection('share-url')
+        <link rel="canonical" href="@yield('share-url')">
+        <meta property="og:type" content="website">
+        <meta property="og:locale" content="id_ID">
+        <meta property="og:site_name" content="SIMPEG">
+        <meta property="og:title" content="@yield('title', 'Jadwal Publik') · SIMPEG">
+        <meta property="og:description" content="@yield('description')">
+        <meta property="og:url" content="@yield('share-url')">
+        <meta property="og:image" content="{{ asset('jadwal-preview.png') }}">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="630">
+        <meta property="og:image:alt" content="Jadwal Publik SIMPEG Kecamatan Pontianak Selatan">
+        <meta name="twitter:card" content="summary_large_image">
+    @endif
+    @yield('robots')
     <script>
         if (window.frameElement?.hasAttribute('data-workspace-frame')) {
             document.documentElement.dataset.workspaceFrame = 'true';
@@ -31,5 +50,8 @@
             @yield('content')
         </main>
     </div>
+    <footer class="mx-auto max-w-[1440px] px-4 pb-6 sm:px-6 lg:px-10 print:hidden">
+        <a class="inline-flex min-h-11 items-center text-sm font-medium text-sky-800 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700" href="{{ route('privacy') }}">Pemberitahuan privasi</a>
+    </footer>
 </body>
 </html>
